@@ -1,0 +1,56 @@
+version: '3.5'
+services:
+
+  ## RabbitMQ server image is built and deployed
+  ## relies on rabbitmq:alpine image
+  rabbitmq:
+    build:
+      context: ./rabbitmq
+      dockerfile: Dockerfile
+    image: ute:rabbitmq
+    container_name: ute_rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      ute_net:
+        ipv4_address: 172.18.100.2
+
+  ## defines the flower container for monitoring RabbitMQ
+  ## flower will wait for rabbitmq to start first, and then attempt
+  ## connection
+  flower:
+    depends_on:
+      - "rabbitmq"
+    image: mher/flower:latest
+    command: --broker=amqp://utbot:ultimaThule@172.18.100.2:5672/utbot_vhost
+    command: --broker-api=http://utbot:ultimaThule@172.18.100.2:15672/api/
+    container_name: ute_flower
+    ports:
+      - "5555:5555"
+    networks:
+      ute_net:
+        ipv4_address: 172.18.100.3
+
+  ## defines a celery worker
+  celery_client:
+    depends_on:
+      - "rabbitmq"
+    image: 
+    container_name: ute_worker
+    networks:
+      ute_net:
+
+# create the 'ute_net' network if it doesn't exist yet
+networks:
+  ute_net:
+    name: ute_net
+    external: true
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.18.100.0/24
+
+
+
