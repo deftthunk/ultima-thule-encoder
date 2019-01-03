@@ -1,6 +1,23 @@
 version: '3.5'
 services:
 
+  ## nfs server for hosting test files
+  nfs:
+    image: erichough/nfs-server:latest
+    command: 
+    container_name: ute_nfs
+    volumes:
+      - type: bind
+        source: ../samples
+        target: /inbound
+      - type: bind
+        source: ../test
+        target: /outbound
+    ports:
+      - "2049:2049"
+    networks:
+      ute_net:
+
   ## RabbitMQ server image is built and deployed
   ## relies on rabbitmq:alpine image
   rabbitmq:
@@ -14,7 +31,6 @@ services:
       - "15672:15672"
     networks:
       ute_net:
-        ipv4_address: 172.18.100.2
 
   ## defines the flower container for monitoring RabbitMQ
   ## flower will wait for rabbitmq to start first, and then attempt
@@ -23,21 +39,23 @@ services:
     depends_on:
       - "rabbitmq"
     image: mher/flower:latest
-    command: --broker=amqp://utbot:ultimaThule@172.18.100.2:5672/utbot_vhost
-    command: --broker-api=http://utbot:ultimaThule@172.18.100.2:15672/api/
+    command: --broker=amqp://utbot:ultimaThule@rabbitmq:5672/utbot_vhost
+    command: --broker-api=http://utbot:ultimaThule@rabbitmq:15672/api/
     container_name: ute_flower
     ports:
       - "5555:5555"
     networks:
       ute_net:
-        ipv4_address: 172.18.100.3
 
   ## defines a celery worker
-  celery_client:
+  worker:
     depends_on:
       - "rabbitmq"
     image: 
     container_name: ute_worker
+    volumes:
+      - nfs-share:/inbound
+      - nfs-share:/outbound
     networks:
       ute_net:
 
@@ -52,5 +70,13 @@ networks:
       config:
         - subnet: 172.18.100.0/24
 
-
+## point participating containers (namely the workers) at the NFS container
+## we setup up above, as a "local volume"
+volumes:
+  nfs-share:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: nfsvers=4,addr=nfs,rw
+      device: "nfs:/"
 
