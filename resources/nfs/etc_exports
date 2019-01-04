@@ -1,0 +1,13 @@
+## NFS exports, placed in the NFS container at /etc/exports when built.
+## These are folder paths that will be connected to folders on your host,
+## via the volume settings for the NFS container in docker-compose.yml.
+##
+## Format:
+## <exported dir> <receiving host or network>(<options>) <host/network> ...
+##
+## Examples:
+## /inbound 192.168.1.100(rw) 192.168.1.105(ro)
+## /outbound 192.168.1.0/24(rw)
+
+/inbound 172.18.100.0/24(rw)
+/outbound 172.18.100.0/24(rw)

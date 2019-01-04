@@ -4,8 +4,9 @@ services:
   ## nfs server for hosting test files
   nfs:
     image: erichough/nfs-server:latest
-    command: 
     container_name: ute_nfs
+    cap_add:
+      - SYS_ADMIN
     volumes:
       - type: bind
         source: ../samples
@@ -13,6 +14,9 @@ services:
       - type: bind
         source: ../test
         target: /outbound
+      - type: bind
+        source: ./resources/nfs/etc_exports
+        target: /etc/exports
     ports:
       - "2049:2049"
     networks:
@@ -22,8 +26,8 @@ services:
   ## relies on rabbitmq:alpine image
   rabbitmq:
     build:
-      context: ./rabbitmq
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: dockerfiles/Dockerfile.rabbitmq
     image: ute:rabbitmq
     container_name: ute_rabbitmq
     ports:
@@ -49,9 +53,12 @@ services:
 
   ## defines a celery worker
   worker:
+    build:
+      context: .
+      dockerfile: dockerfiles/Dockerfile.worker
     depends_on:
       - "rabbitmq"
-    image: 
+    image: ute:worker
     container_name: ute_worker
     volumes:
       - nfs-share:/inbound
