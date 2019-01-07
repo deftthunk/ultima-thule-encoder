@@ -1,27 +1,6 @@
 version: '3.5'
 services:
 
-  ## nfs server for hosting test files
-  nfs:
-    image: erichough/nfs-server:latest
-    container_name: ute_nfs
-    cap_add:
-      - SYS_ADMIN
-    volumes:
-      - type: bind
-        source: ../samples
-        target: /inbound
-      - type: bind
-        source: ../test
-        target: /outbound
-      - type: bind
-        source: ./resources/nfs/etc_exports
-        target: /etc/exports
-    ports:
-      - "2049:2049"
-    networks:
-      ute_net:
-
   ## RabbitMQ server image is built and deployed
   ## relies on rabbitmq:alpine image
   rabbitmq:
@@ -60,9 +39,11 @@ services:
       - "rabbitmq"
     image: ute:worker
     container_name: ute_worker
+    cap_add:
+    - SYS_ADMIN
     volumes:
-      - nfs-share:/inbound
-      - nfs-share:/outbound
+      - nfs-in:/inbound
+      - nfs-out:/outbound
     networks:
       ute_net:
 
@@ -70,7 +51,7 @@ services:
 networks:
   ute_net:
     name: ute_net
-    external: true
+    external: false
     driver: bridge
     ipam:
       driver: default
@@ -80,10 +61,17 @@ networks:
 ## point participating containers (namely the workers) at the NFS container
 ## we setup up above, as a "local volume"
 volumes:
-  nfs-share:
+  nfs-in:
     driver: local
     driver_opts:
       type: nfs
-      o: nfsvers=4,addr=nfs,rw
-      device: "nfs:/"
+      o: addr=192.168.2.186,rw
+      device: ":/home/bruce/temp/jim/inbound"
+      
+  nfs-out:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.2.186,rw
+      device: ":/home/bruce/temp/jim/outbound"
 

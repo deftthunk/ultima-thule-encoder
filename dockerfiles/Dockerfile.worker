@@ -13,9 +13,11 @@ WORKDIR /home/utbot
 RUN pip3 install celery
 
 COPY resources/x265/x265 /usr/local/bin/x265
+COPY resources/worker/run.sh /home/utbot/run.sh
 COPY code /home/utbot/code
 ENV PATH="/home/utbot/.local/bin:${PATH}"
 
 ## will be replaced with a more specific COMMAND 
 ## directive in docker-compose.yml
-ENTRYPOINT [ "celery", "-A", "code", "worker", "--loglevel=info" ]
+#ENTRYPOINT [ "celery", "-A", "code", "worker", "--loglevel=info" ]
+CMD [ "/home/utbot/run.sh" ]

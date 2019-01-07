@@ -1,5 +1,5 @@
 from __future__ import absolute_import
-from ut_encode.celery import app
+from code.celery import app
 import time
 
 @app.task

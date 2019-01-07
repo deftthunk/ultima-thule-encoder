@@ -1,8 +1,8 @@
 from __future__ import absolute_import
-from celery import Celery
+from code import Celery
 
-app = Celery('ut_encode', 
+app = Celery('code', 
         broker='amqp://utbot:ultimaThule@172.18.100.2/utbot_vhost',
         backend='rpc://',
-        include=['ut_encode.tasks'])
+        include=['code.tasks'])
 
