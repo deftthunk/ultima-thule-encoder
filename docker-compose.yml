@@ -38,6 +38,7 @@ services:
     depends_on:
       - "rabbitmq"
     image: ute:worker
+    command: celery -A ut_project --pool=prefork --concurrency=2 --loglevel=info
     container_name: ute_worker
     cap_add:
     - SYS_ADMIN
@@ -65,13 +66,13 @@ volumes:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.2.186,rw
+      o: addr=192.168.1.252,rw
       device: ":/home/bruce/temp/jim/inbound"
       
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.2.186,rw
+      o: addr=192.168.1.252,rw
       device: ":/home/bruce/temp/jim/outbound"
 
