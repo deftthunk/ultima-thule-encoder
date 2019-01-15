@@ -5,7 +5,9 @@ RUN apt-get update && \
 	python3-pip \
 	python3-dev \
 	python3-setuptools \
-	python3-wheel && \
+	python3-wheel \
+        mediainfo \
+        ffmpeg && \
   useradd -ms /bin/bash utbot
 
 USER utbot
@@ -17,6 +19,4 @@ COPY ./resources/worker/run.sh /home/utbot/run.sh
 COPY ./ut_project /home/utbot/ut_project
 ENV PATH="/home/utbot/.local/bin:${PATH}"
 
-## will be replaced with a more specific COMMAND 
-## directive in docker-compose.yml
 CMD [ "/home/utbot/run.sh" ]

@@ -7,7 +7,7 @@
 ## 'rabbitmqctl' commands must run once the server is up. so, we
 ## fork them off behind a sleep, and they run once the server is up
 
-sleep 15 && \
+sleep 20 && \
 # enable rabbitmq management plugin for flower access
 rabbitmq-plugins enable rabbitmq_management && \
 # set TTL policy

@@ -1,19 +1,27 @@
 version: '3.5'
 services:
 
+
   ## RabbitMQ server image is built and deployed
   ## relies on rabbitmq:alpine image
   rabbitmq:
-    build:
-      context: .
-      dockerfile: dockerfiles/Dockerfile.rabbitmq
     image: ute:rabbitmq
-    container_name: ute_rabbitmq
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - target: 5672
+        published: 5672
+        protocol: tcp
+        mode: ingress
+      - target: 15672
+        published: 15672
+        protocol: tcp
+        mode: ingress
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
     networks:
       ute_net:
+
 
   ## defines the flower container for monitoring RabbitMQ
   ## flower will wait for rabbitmq to start first, and then attempt
@@ -22,42 +30,51 @@ services:
     depends_on:
       - "rabbitmq"
     image: mher/flower:latest
-    command: --broker=amqp://utbot:ultimaThule@rabbitmq:5672/utbot_vhost
-    command: --broker-api=http://utbot:ultimaThule@rabbitmq:15672/api/
-    container_name: ute_flower
+    command: "--broker=amqp://utbot:ultimaThule@rabbitmq:5672/utbot_vhost
+              --broker-api=http://utbot:ultimaThule@rabbitmq:15672/api/"
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
     ports:
-      - "5555:5555"
+      - target: 5555
+        published: 5555
+        protocol: tcp
+        mode: host
     networks:
       ute_net:
 
-  ## defines a celery worker
+
+## defines a task to run the celery worker container in.
+## these tasks are replicated through the docker swarm nodes
   worker:
-    build:
-      context: .
-      dockerfile: dockerfiles/Dockerfile.worker
     depends_on:
       - "rabbitmq"
     image: ute:worker
-    command: celery -A ut_project --pool=prefork --concurrency=2 --loglevel=info
-    container_name: ute_worker
-    cap_add:
-    - SYS_ADMIN
+#    command: celery -A ut_project --pool=prefork --concurrency=2 --loglevel=info
+#    cap_add:
+#    - SYS_ADMIN
     volumes:
-      - nfs-in:/inbound
-      - nfs-out:/outbound
+      - "nfs-in:/inbound"
+      - "nfs-out:/outbound"
     networks:
       ute_net:
+    deploy:
+      mode: replicated
+      replicas: 2
+      resources:
+        limits:
+          cpus: '.80'
+          memory: 400M
+        
 
 # create the 'ute_net' network if it doesn't exist yet
 networks:
   ute_net:
     name: ute_net
-    external: false
-    driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.18.100.0/24
+    driver: overlay
+    attachable: true
+
 
 ## point participating containers (namely the workers) at the NFS container
 ## we setup up above, as a "local volume"
@@ -66,13 +83,13 @@ volumes:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.1.252,rw
-      device: ":/home/bruce/temp/jim/inbound"
+      o: addr=192.168.2.178,ro,nolock
+      device: ":/volume1/nfs_test"
       
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.1.252,rw
-      device: ":/home/bruce/temp/jim/outbound"
+      o: addr=192.168.2.178,rw,nolock
+      device: ":/volume1/nfs_write"
 
