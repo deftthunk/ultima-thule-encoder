@@ -115,6 +115,8 @@ docker stack deploy
 -jobCount ???
 -number of worker tasks
 -worker resource specs
+-celery worker timelimit (worker run.sh)
+
 
 
 ##

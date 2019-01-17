@@ -1,10 +1,12 @@
-from __future__ import absolute_import
 from ut_project.celery import app
-import time
+from time import sleep
 
 @app.task
-def encode(args):
-    
+def encode(cmd):
+    status = subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT, \
+            stdout=subprocess.PIPE)
 
-def unmarshal():
+    return (status.returncode, status.stdout)
+        
+
 

@@ -1,5 +1,11 @@
 FROM debian:stretch-slim
 
+## add x265, its shared libraries, and paths
+COPY ./resources/x265/bin/x265 /usr/local/bin/
+COPY ./resources/x265/bin/libx265* /usr/local/lib/
+COPY ./resources/worker/ld.so.conf /etc/ld.so.conf
+
+## install python3, add user 'utbot', and update shared lib path
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
 	python3-pip \
@@ -8,13 +14,16 @@ RUN apt-get update && \
 	python3-wheel \
         mediainfo \
         ffmpeg && \
-  useradd -ms /bin/bash utbot
+  useradd -ms /bin/bash utbot && \
+  ldconfig
 
+## become user 'utbot', change working dir, install Celery
 USER utbot
 WORKDIR /home/utbot
 RUN pip3 install celery
 
-COPY ./resources/x265/x265 /usr/local/bin/x265
+## add main script loop, UTE python celery code, and
+## set celery execution path
 COPY ./resources/worker/run.sh /home/utbot/run.sh
 COPY ./ut_project /home/utbot/ut_project
 ENV PATH="/home/utbot/.local/bin:${PATH}"

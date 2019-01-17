@@ -21,8 +21,8 @@ frameCount=`mediainfo --fullscan $1 | \
 
 #echo framecount "$framecount"
 
-# jobnum controls how many jobs we're making, we should make this an input
-jobnum=6
+# jobCount controls how many jobs we're making, we should make this an input
+jobCount=100
 
 #crop detection code cribbed elsewhere
 cropdetect="$(ffmpeg -ss 900 -i $1 -t 1 -vf "cropdetect=24:16:0" -preset ultrafast -f null - 2>&1 | awk '/crop/ { print $NF }' | tail -1)"
@@ -31,7 +31,7 @@ cropdetect="$(ffmpeg -ss 900 -i $1 -t 1 -vf "cropdetect=24:16:0" -preset ultrafa
 buffer=100 #frames on either side of job, should take this as input
 
 # jobsize is number of frames per job + 1 to round, better to go off the end than come up short
-jobsize=$(((( frameCount / jobnum )) +1 ))
+jobsize=$(((( frameCount / jobCount )) +1 ))
 
 #echo jobsize $jobsize 
 
@@ -54,7 +54,7 @@ seek=$((seek + frames - buffer - buffer))
 
 #echo seek before loop $seek
 
-while [ $counter -lt $jobnum ]; do
+while [ $counter -lt $jobCount ]; do
 
 	frames=$(( jobsize + buffer + buffer)) #jobs in the loop arte buffered on both sides
 #	echo frames in loop top $frames

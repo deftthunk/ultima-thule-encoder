@@ -5,6 +5,6 @@
 sleep 45
 
 while true; do
-  celery -A ut_project worker --loglevel=info
+  celery -A ut_project worker --time-limit=600 --loglevel=info
   sleep 60
 done
