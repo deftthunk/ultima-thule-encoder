@@ -2,7 +2,7 @@
 
 ## grab everything needed for the build environment
 apt-get update
-apt-get install -y --no-install-recommends mercurial cmake cmake-curses-gui build-essential ca-certificates
+apt-get install -y mercurial cmake cmake-curses-gui build-essential ca-certificates nasm
 
 ## go to directory where script is located
 parentDir="$(dirname "$0")"
@@ -12,7 +12,7 @@ cd src
 
 ## download and compile x265 source
 echo "Downloading x265 source code"
-hg clone https://bitbucket.org/multicoreware/x265
+hg clone --config ui.clonebundles=false https://bitbucket.org/multicoreware/x265
 cd ./x265/build/linux
 cmake -G "Unix Makefiles" "../../source"
 make

@@ -1,0 +1,129 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+
+  config.vm.define "node1" do |n1|
+    n1.vm.box = "deb96_nogui"
+    n1.vm.hostname = "n1"
+    n1.ssh.username = "vagrant"
+    n1.ssh.password = "vagrant"
+
+    ## update hosts file for ansible's inventory
+    n1.trigger.after :up, :destroy, :halt do |trigger|
+      trigger.info = "Running vagranttoansible to update hosts inventory"
+      trigger.run = {path: "scripts/inventory_refresh.sh"}
+    end
+
+    n1.vm.provider "virtualbox" do |vb|
+      vb.gui = false
+      vb.memory = 512
+      vb.cpus = 2
+    end
+    
+    ## add SSH public key for ansible orchastration
+    n1.vm.provision "shell", inline: <<-SHELL
+      mkdir -p /home/vagrant/.ssh
+      sudo chown vagrant:vagrant .ssh
+      cat /vagrant/keys/id_rsa.pub >> /home/vagrant/.ssh/authorized_keys
+      sudo chown vagrant:vagrant /home/vagrant/.ssh/authorized_keys
+    SHELL
+
+  end
+
+
+  config.vm.define "node2" do |n2|
+    n2.vm.box = "deb96_nogui"
+    n2.vm.hostname = "n2"
+    n2.ssh.username = "vagrant"
+    n2.ssh.password = "vagrant"
+
+    #n2.vm.synced_folder ".", "/vagrant", disabled: true  
+    #n2.vm.network "private_network", ip: "#{subnet}.102", virtualbox__intnet: "intnet"
+
+    n2.vm.provider "virtualbox" do |vb|
+      vb.gui = false
+      vb.memory = 512
+      vb.cpus = 2
+    end
+
+    ## update hosts file for ansible's inventory
+    n2.trigger.after :up, :destroy, :halt do |trigger|
+      trigger.info = "Running vagranttoansible to update hosts inventory"
+      trigger.run = {path: "scripts/inventory_refresh.sh"}
+    end
+
+    ## add SSH public key for ansible orchastration
+    n2.vm.provision "shell", inline: <<-SHELL
+      mkdir -p /home/vagrant/.ssh
+      sudo chown vagrant:vagrant .ssh
+      cat /vagrant/keys/id_rsa.pub >> /home/vagrant/.ssh/authorized_keys
+      sudo chown vagrant:vagrant /home/vagrant/.ssh/authorized_keys
+    SHELL
+
+  end
+
+
+  config.vm.define "node3" do |n3|
+    n3.vm.box = "deb96_nogui"
+    n3.vm.hostname = "n3"
+    n3.ssh.username = "vagrant"
+    n3.ssh.password = "vagrant"
+    
+    #n3.vm.synced_folder ".", "/vagrant", disabled:true
+    #n3.vm.network "private_network", ip: "#{subnet}.103", virtualbox__intnet: "intnet"
+
+    n3.vm.provider "virtualbox" do |vb|
+      vb.gui = false
+      vb.memory = 512
+      vb.cpus = 2
+    end
+
+    ## update hosts file for ansible's inventory
+    n3.trigger.after :up, :destroy, :halt do |trigger|
+      trigger.info = "Running vagranttoansible to update hosts inventory"
+      trigger.run = {path: "scripts/inventory_refresh.sh"}
+    end
+
+    ## add SSH public key for ansible orchastration
+    n3.vm.provision "shell", inline: <<-SHELL
+      mkdir -p /home/vagrant/.ssh
+      sudo chown vagrant:vagrant .ssh
+      cat /vagrant/keys/id_rsa.pub >> /home/vagrant/.ssh/authorized_keys
+      sudo chown vagrant:vagrant /home/vagrant/.ssh/authorized_keys
+    SHELL
+
+  end
+
+
+  config.vm.define "node4" do |n4|
+    n4.vm.box = "deb96_nogui"
+    n4.vm.hostname = "n4"
+    n4.ssh.username = "vagrant"
+    n4.ssh.password = "vagrant"
+
+    #n4.vm.synced_folder ".", "/vagrant", disabled:true
+    #n4.vm.network "private_network", ip: "#{subnet}.104", virtualbox__intnet: "intnet"
+
+    n4.vm.provider "virtualbox" do |vb|
+      vb.gui = false
+      vb.memory = 512
+      vb.cpus = 2
+    end
+
+    ## update hosts file for ansible's inventory
+    n4.trigger.after :up, :destroy, :halt do |trigger|
+      trigger.info = "Running vagranttoansible to update hosts inventory"
+      trigger.run = {path: "scripts/inventory_refresh.sh"}
+    end
+
+    ## add SSH public key for ansible orchastration
+    n4.vm.provision "shell", inline: <<-SHELL
+      mkdir -p /home/vagrant/.ssh
+      sudo chown vagrant:vagrant .ssh
+      cat /vagrant/keys/id_rsa.pub >> /home/vagrant/.ssh/authorized_keys
+      sudo chown vagrant:vagrant /home/vagrant/.ssh/authorized_keys
+    SHELL
+
+  end
+end

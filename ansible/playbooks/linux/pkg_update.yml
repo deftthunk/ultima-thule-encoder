@@ -1,0 +1,13 @@
+---
+- hosts: all
+  become: true
+  tasks:
+    # Fedora #
+  - name: Update Fedora Cache
+    yum: update_cache=yes state=latest
+    when: ansible_distribution == "Fedora"
+
+    # Debian #
+  - name: Update Debian Cache
+    apt: update_cache=yes state=latest
+    when: ansible_distribution == "Debian"

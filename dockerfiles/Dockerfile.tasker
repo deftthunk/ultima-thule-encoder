@@ -1,10 +1,5 @@
 FROM debian:stretch-slim
 
-## add x265, its shared libraries, and paths
-COPY ./resources/x265/bin/x265 /usr/local/bin/
-COPY ./resources/x265/bin/libx265* /usr/local/lib/
-COPY ./resources/worker/ld.so.conf /etc/ld.so.conf
-
 ## install python3, add user 'utbot', and update shared lib path
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
@@ -29,4 +24,6 @@ COPY ./resources/worker/run.sh /home/utbot/run.sh
 COPY ./ut_project /home/utbot/ut_project
 ENV PATH="/home/utbot/.local/bin:${PATH}"
 
-CMD [ "/home/utbot/run.sh" ]
+USER root
+
+ENTRYPOINT [ "/bin/bash" ]

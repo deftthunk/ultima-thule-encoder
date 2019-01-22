@@ -1,16 +1,16 @@
 from ut_project.celery import app
-import time
+from time import sleep
+import subprocess
 
 @app.task
-def longtime_add(x, y):
-    print('long time task begins')
-    time.sleep(5)
-    print('long time task finished')
-    return x + y
+def encode(cmd):
+    status = subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT, \
+            stdout=subprocess.PIPE)
 
+    return (status.returncode, status.stdout)
+        
 @app.task
-def subtract(x, y):
-    print('start subtract')
-    time.sleep(5)
-    print('subtract finished')
-    return x - y
+def testMe(arg):
+    sleep(10)
+
+    return arg

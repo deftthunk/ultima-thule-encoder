@@ -1,0 +1,33 @@
+---
+- hosts: all
+  become: yes
+  tasks:
+  - name: Install Docker prerequisites
+    apt:  name={{item}} update_cache=yes
+    with_items:
+     - apt-transport-https
+     - ca-certificates
+     - curl
+     - software-properties-common
+
+  - name: Add Docker GPG key
+    apt_key:  url=https://download.docker.com/linux/debian/gpg
+
+  - name: Add Docker APT repository
+    apt_repository:
+      repo: deb [arch=amd64] https://download.docker.com/linux/debian {{ansible_distribution_release}} stable
+
+  - name: Install Docker
+    apt:  name=docker-ce
+
+  - name: Add user to docker group
+    user:
+      name: vagrant
+      groups: docker
+      append: yes
+
+  - name: Restart docker daemon
+    systemd:
+      name: docker
+      state: restarted
+      daemon_reload: yes
