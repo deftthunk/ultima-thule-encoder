@@ -120,6 +120,11 @@ docker run --network ute_net mher/flower:latest --broker=amqp://utbot:ultimaThul
 - ansible-playbook -i ./hosts.ini ansible/playbooks/linux/swarm_node_setup.yml
 
 
+##
+## ansible container
+##
+- must include sshpass
+
 
 ##
 ## creating a swarm node (w/ registry)

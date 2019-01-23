@@ -1,0 +1,26 @@
+FROM debian:testing-slim
+
+## software for setting up and interacting with the UTE environment
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+        sshpass \
+        ansible \
+        openssl \
+        openssh-client \
+        nfs-common \
+        vim \
+        nano \
+        nmap
+
+## setup some bash colors and aliases for the terminal
+COPY resources/shell/bashrc /root/.bashrc
+COPY resources/shell/entry.sh /root/entry.sh
+
+## Create a mount point '/host' and set it as the working dir. This
+## will be mounted to at container runtime (docker run) to the UTE 
+## directory for running commands and interacting with config files.
+VOLUME ["/host"]
+WORKDIR /host
+
+## container will start with an interactive shell
+ENTRYPOINT [ "/root/entry.sh" ]

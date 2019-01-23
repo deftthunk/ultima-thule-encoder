@@ -97,13 +97,13 @@ volumes:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.2.178,ro,nolock
+      o: addr=192.168.1.252,ro,nolock
       device: ":/volume1/nfs_test"
       
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.2.178,rw,nolock
+      o: addr=192.168.1.252,rw,nolock
       device: ":/volume1/nfs_write"
 
