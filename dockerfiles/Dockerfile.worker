@@ -9,10 +9,15 @@ COPY ./resources/worker/ld.so.conf /etc/ld.so.conf
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
 	python3-pip \
+        python-pip \
 	python3-dev \
+        python-dev \
 	python3-setuptools \
+        python-setuptools \
 	python3-wheel \
+        python-wheel \
         python3-docker \
+        python-docker \
         mediainfo \
         ffmpeg && \
   useradd -ms /bin/bash utbot && \

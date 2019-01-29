@@ -9,12 +9,17 @@ TODO:
 - add asyncio functionality for monitoring when celery worker count changes
 - provide Celery worker direct and broadcast control for monitoring
 '''
+workFolder = "/inbound"
+outFolder = "/outbound"
+
 
 ## grab first file found in the NFS 'inbound' folder
 def findWork():
-    files = os.listdir("/inbound")
+    listOfFiles = list()
+    for (dirPath, dirNames, fileNames) in os.walk(workFolder):
+        listOfFiles += [os.path.join(dirPath, entry) for entry in fileNames]
 
-    return files
+    return listOfFiles
 
 
 ## ping Celery clients using the broker container to get a count of 
@@ -22,16 +27,16 @@ def findWork():
 def getClientCount():
     pingRet = app.control.ping(timeout=3.0)
 
-    return len(ping)
+    return len(pingRet)
 
 
 ## use 'mediainfo' tool to determine number of frames
 def getFrameCount(target):
     cmdRet = subprocess.run(["mediainfo", "--fullscan", target], \
             stdout=subprocess.PIPE)
-    match = re.match('^Frame count\s+\:\s(\d+)', cmdRet.stdout)
+    match = re.search('Frame count.*?(\d+)', cmdRet.stdout.decode('utf-8'))
 
-    return match.group(1)
+    return int(match.group(1))
 
 
 ## use ffmpeg to detect video cropping in target sample
@@ -77,9 +82,9 @@ def buildCmdString(target, frameCountTotal, clientCount):
         crop = "-filter:v \"{}\"".format(tempCrop)
 
     ## initial values for first loop iteration
-    counter, seek, chunkstart = 0, 0, 0
+    counter, seek, chunkStart = 0, 0, 0
     chunkEnd = jobSize - 1
-    frames = jobsize + frameBufferSize
+    frames = jobSize + frameBufferSize
 
     ## ffmpeg and x265 CLI args, with placeholder variables defined in the 
     ## .format() method below
@@ -117,14 +122,13 @@ def buildCmdString(target, frameCountTotal, clientCount):
                 cs = chunkStart, \
                 ce = chunkEnd, \
                 ctr = "counter: ") \
-        )
 
         ## push built CLI command onto end of list
         encodeTasks.append(ffmpegStr)
 
         chunkStart = frameBufferSize
         chunkEnd = chunkStart + jobSize - 1
-        frames = jobSize + (frameBuffer * 2)
+        frames = jobSize + (frameBufferSize * 2)
         seek = seek + frames - (frameBufferSize * 2)
         counter += 1
 
@@ -145,7 +149,8 @@ def populateQueue(encodeTasks):
     taskId = 0
 
     for task in encodeTasks:
-        statusHandles.append(encode.delay(taskId, task))
+        #statusHandles.append(encode.delay(taskId, task))
+        statusHandles.append(encode.delay(task))
         taskId += 1
         
     return statusHandles
@@ -171,27 +176,34 @@ def waitForTaskCompletion():
 def main():
     while True:
         files = findWork()
+        print("DEBUG files: ", files)
 
         ## if no files are found, wait 1 minute, then check again
         if len(files) == 0:
-            sleep(60)
+            sleep(10)
             continue
 
-        frameCountTotal = getFrameCount()
-        clientCount = getClientCount()
+        for targetFile in files:
+            frameCountTotal = getFrameCount(targetFile)
+            clientCount = getClientCount()
+        
+            print("DEBUG frameCountTotal: ", frameCountTotal)
+            print("DEBUG clientCount: ", clientCount)
  
-        ## bug - rabbitmq does not always respond to connection attempts
-        if clientCount = 0:
-            clientCount = getClientCount()
-            clientCount = getClientCount()
+            ## bug - rabbitmq does not always respond to connection attempts
+            if clientCount == 0:
+                clientCount = getClientCount()
+                clientCount = getClientCount()
     
-        encodeTasks = buildCmdString(files[0], frameCountTotal, clientCount)
-        populateQueue(encodeTasks)
+            encodeTasks = buildCmdString(files[0], frameCountTotal, clientCount)
+            populateQueue(encodeTasks)
+            print("DEBUG encodeTasks: ", encodeTasks)
+
+            print("DEBUG sleep 60")
+            sleep(60)
 
 
-
-
-
+main()
 
 
 

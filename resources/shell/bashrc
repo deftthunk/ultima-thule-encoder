@@ -1,3 +1,24 @@
-PS1='\[\033[01;32m\]\u@UTE-Shell\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]# '
+PS1='\[\033[01;32m\]\u@UTE-Shell\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$ '
 
 alias ls='ls --color=auto'
+
+export PATH="$PATH:$HOME/.local/bin"
+
+echo "
+#######################################################
+Welcome to Ultima Thule Encoder! This is the UTE shell.
+#######################################################
+        << Quick Command Cheat Sheet >>
+
+Show all possible commands:
+# ute help
+
+First time setup:
+# ute install
+  
+List all physical nodes in the swarm:
+# ute list-nodes
+
+List all services (containers) running in swarm:
+# ute list-services
+"

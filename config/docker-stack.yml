@@ -75,7 +75,7 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 6
+      replicas: 2
       resources:
         limits:
           cpus: '.80'
@@ -93,17 +93,27 @@ networks:
 ## point participating containers (namely the workers) at the NFS container
 ## we setup up above, as a "local volume"
 volumes:
+  
+
   nfs-in:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.1.252,ro,nolock
-      device: ":/volume1/nfs_test"
+      o: addr=192.168.1.209,rw,nolock,noresvport
+      device: ":/inbound"
+#      device: ":/volume1/nfs_test"
+#      type: nfs
+#      o: addr=172.31.98.152,rw,nolock
+#      device: ":/volume1/nfs_test"
+#      device: ":/inbound"
       
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.1.252,rw,nolock
-      device: ":/volume1/nfs_write"
-
+      o: addr=192.168.1.209,rw,nolock,noresvport
+      device: ":/outbound"
+#      type: nfs
+#      o: addr=172.31.98.152,rw,nolock
+#      device: ":/volume1/nfs_write"
+#      device: ":/outbound"

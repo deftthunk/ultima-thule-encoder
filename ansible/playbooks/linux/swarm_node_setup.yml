@@ -7,9 +7,16 @@
     run_once: true
 
     ## https://docs.ansible.com/ansible/latest/modules/docker_image_module.html
-  - name: Copy docker worker image to tar archive
-    local_action: command docker image save -o ../../worker_staging/ute_worker.tar ute:worker
-    run_once: true
+#  - name: Copy docker worker image to tar archive
+#    local_action: command docker image save -o ../../worker_staging/ute_worker.tar ute:worker
+#    run_once: true
+
+   
+  - name: Archive docker worker image to tar archive
+    docker_image:
+      name: ute
+      tag: worker
+      archive_path: ute_worker.tar
 
   - name: Get info for next task to check if file exists
     local_action: stat path=../../worker_staging/ute_worker.tar.gz
@@ -29,8 +36,8 @@
   - name: Uncompress docker image on remote nodes
     command: gunzip "/home/{{ ansible_ssh_user }}/ute_worker.tar.gz"
 
-#  - name: Install docker image ute:worker
-#    command: docker image load -i "/home/{{ ansible_ssh_user }}/ute_worker.tar"
+  - name: Install docker image ute:worker
+    command: docker image load -i "/home/{{ ansible_ssh_user }}/ute_worker.tar"
 
   - name: Join node to swarm
     shell: "/home/{{ ansible_ssh_user }}/token_cmd.sh"

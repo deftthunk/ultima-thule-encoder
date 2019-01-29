@@ -10,11 +10,24 @@ RUN apt-get update && \
         nfs-common \
         vim \
         nano \
-        nmap
+        python-pip \
+        python-setuptools \
+        python-wheel && \
+    useradd -ms /bin/bash utbot
 
-## setup some bash colors and aliases for the terminal
-COPY resources/shell/bashrc /root/.bashrc
-COPY resources/shell/entry.sh /root/entry.sh
+## install docker python
+USER utbot
+WORKDIR /home/utbot
+RUN pip install docker
+
+## setup bashrc's, entry script, and ansible global config
+COPY resources/shell/bashrc /home/utbot/.bashrc
+COPY resources/shell/bashrc_root /root/.bashrc
+COPY resources/shell/entry.sh /home/utbot/entry.sh
+COPY resources/shell/ansible.cfg /home/utbot/.ansible.cfg
+
+## change back to root. 'entry.sh' script will change root password
+USER root
 
 ## Create a mount point '/host' and set it as the working dir. This
 ## will be mounted to at container runtime (docker run) to the UTE 
@@ -23,4 +36,4 @@ VOLUME ["/host"]
 WORKDIR /host
 
 ## container will start with an interactive shell
-ENTRYPOINT [ "/root/entry.sh" ]
+ENTRYPOINT [ "/home/utbot/entry.sh" ]

@@ -3,12 +3,12 @@
   become: yes
   tasks:
   - name: Install Docker prerequisites
-    apt:  name={{item}} update_cache=yes
-    with_items:
-     - apt-transport-https
-     - ca-certificates
-     - curl
-     - software-properties-common
+    apt:
+      name: ['apt-transport-https', 'ca-certificates', 'curl',
+        'software-properties-common', 'python-setuptools', 'python-pip']
+      state: present
+      update_cache: yes
+      autoclean: yes
 
   - name: Add Docker GPG key
     apt_key:  url=https://download.docker.com/linux/debian/gpg
@@ -19,6 +19,11 @@
 
   - name: Install Docker
     apt:  name=docker-ce
+
+  - name: Install dependent python modules
+    pip:
+      name: ['docker-py', 'docker-compose', 'requests', 'urllib3']
+      state: present
 
   - name: Add user to docker group
     user:

@@ -42,6 +42,12 @@ scriptPath=`dirname $script`
 #fi
 
 
+## get user's uid and gid, so that the container can run with the same
+## permissions and create/modify files with same permissions
+#dockerUid=$(id -u)
+#dockerGid=$(id -g)
+
+
 ## run shell container in interactive mode. we're mounting the top level
 ## directory of UTE, and also binding to this host's docker socket so we
 ## can administrate from within this container
