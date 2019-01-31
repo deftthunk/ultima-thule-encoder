@@ -1,4 +1,4 @@
-FROM debian:stretch-slim
+FROM debian:testing-slim
 
 ## install python3, add user 'utbot', and update shared lib path
 RUN apt-get update && \
@@ -9,7 +9,10 @@ RUN apt-get update && \
 	python3-wheel \
         python3-docker \
         mediainfo \
+        vim \ 
         ffmpeg && \
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/* && \
   useradd -ms /bin/bash utbot && \
   ldconfig
 
@@ -20,10 +23,11 @@ RUN pip3 install celery
 
 COPY ./ut_project /home/utbot/ut_project
 ENV PATH="/home/utbot/.local/bin:${PATH}"
+#CMD [ "python3", "-m", "ut_project.ut_tasker" ]
 
 ## test block
+COPY ./resources/tasker/run.sh /home/utbot/run.sh
 USER root
-COPY ./resources/test/run.sh /root/run.sh
-ENTRYPOINT [ "/root/run.sh" ]
-
-#CMD [ "python3", "-m", "ut_project.ut_tasker" ]
+RUN chown -R utbot:utbot /home/utbot
+USER utbot
+CMD [ "/home/utbot/run.sh" ]

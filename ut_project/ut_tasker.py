@@ -74,8 +74,8 @@ frames -- number of frames to encode between two 'frameBufferSize' amounts
 def buildCmdString(target, frameCountTotal, clientCount):
     encodeTasks = []
     frameBufferSize = 100
-    jobCount = clientCount * 5
-    jobSize = (frameCountTotal / jobCount) + 1
+    jobCount = clientCount * 1200
+    jobSize = int(round(frameCountTotal / jobCount) + 1)
     crop = detectCropping(target)
     if crop != '':
         tempCrop = crop
@@ -88,14 +88,17 @@ def buildCmdString(target, frameCountTotal, clientCount):
 
     ## ffmpeg and x265 CLI args, with placeholder variables defined in the 
     ## .format() method below
-    while counter < jobSize:
+    while counter < jobCount:
         ffmpegStr = "ffmpeg \
                 -hide_banner \
+                -loglevel fatal \
                 -i {tr} \
                 {cd} \
                 -strict \
                 -1 \
                 -f yuv4mpegpipe - | x265 - \
+                --log-level error \
+                --no-progress \
                 --no-open-gop \
                 --seek {sk} \
                 --frames {fr} \
@@ -106,22 +109,22 @@ def buildCmdString(target, frameCountTotal, clientCount):
                 --colormatrix bt709 \
                 --crf=20 \
                 --fps 24000/1001 \
-                --min \
-                -keyint 24 \
+                --min-keyint 24 \
                 --keyint 240 \
                 --sar 1:1 \
                 --preset slow \
                 --ctu 16 \
                 --y4m \
                 --pools \"+\" \
-                -o chunk{ctr}.265".format( \
+                -o {dst}/chunk{ctr}.265".format( \
                 tr = target, \
                 cd = crop, \
                 sk = seek, \
                 fr = frames, \
                 cs = chunkStart, \
                 ce = chunkEnd, \
-                ctr = "counter: ") \
+                ctr = counter, \
+                dst = outFolder)
 
         ## push built CLI command onto end of list
         encodeTasks.append(ffmpegStr)
@@ -171,6 +174,16 @@ def waitForTaskCompletion():
     #http://docs.celeryproject.org/en/latest/userguide/workers.html#dump-of-reserved-tasks
 
 
+def testEncode(target):
+    encodeTasks = []
+    counter = 0
+    
+    while counter < 10:
+        cmdString = "gzip --fast -k -c {tr} > /outbound/{ctr}file.gz".format(tr = target, ctr = counter)
+        encodeTasks.append(cmdString)
+        counter += 1
+
+    return encodeTasks
 
 
 def main():
@@ -193,15 +206,16 @@ def main():
             ## bug - rabbitmq does not always respond to connection attempts
             if clientCount == 0:
                 clientCount = getClientCount()
+                sleep(1)
                 clientCount = getClientCount()
     
             encodeTasks = buildCmdString(files[0], frameCountTotal, clientCount)
+            #encodeTasks = testEncode(files[0])
             populateQueue(encodeTasks)
             print("DEBUG encodeTasks: ", encodeTasks)
 
-            print("DEBUG sleep 60")
-            sleep(60)
-
+            print("DEBUG exiting")
+            break
 
 main()
 

@@ -1,4 +1,4 @@
-FROM debian:stretch-slim
+FROM debian:testing-slim
 
 ## add x265, its shared libraries, and paths
 COPY ./resources/x265/bin/x265 /usr/local/bin/

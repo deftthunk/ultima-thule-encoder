@@ -7,6 +7,6 @@ echo "Sleeping 45 seconds"
 sleep 45
 
 while true; do
-  celery -A ut_project worker --time-limit=600 --loglevel=info
+  celery -A ut_project worker --time-limit=600 --loglevel=info --concurrency=1
   sleep 30
 done

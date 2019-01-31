@@ -111,7 +111,9 @@ docker run --network ute_net mher/flower:latest --broker=amqp://utbot:ultimaThul
 - number of worker tasks
 - worker resource specs
 - celery worker timelimit (worker run.sh)
-
+- the 'cpus' key in docker-stack.yml is a percentage of cputime on worker
+  machine. to use more than one core, set it over 1.0 (ie. 2.50 will use 
+  two and a half cores per celery '--concurrency=' task)
 
 ##
 ## creating a swarm node (w/o registry)

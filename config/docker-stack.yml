@@ -64,6 +64,9 @@ services:
 
   ## defines a task to run the celery worker container in.
   ## these tasks are replicated through the docker swarm nodes
+  ## the 'cpus' key reflects how much cputime each worker is allowed
+  ## to consume on the host. remove for auto-allocation, or dial in
+  ## for more control per worker (same goes for memory)
   worker:
     depends_on:
       - "rabbitmq"
@@ -78,8 +81,8 @@ services:
       replicas: 2
       resources:
         limits:
-          cpus: '.80'
-          memory: 400M
+          cpus: '1.80'
+          memory: 1000M
  
 
 # create the 'ute_net' network if it doesn't exist yet
@@ -93,27 +96,16 @@ networks:
 ## point participating containers (namely the workers) at the NFS container
 ## we setup up above, as a "local volume"
 volumes:
-  
-
   nfs-in:
     driver: local
     driver_opts:
       type: nfs
       o: addr=192.168.1.209,rw,nolock,noresvport
       device: ":/inbound"
-#      device: ":/volume1/nfs_test"
-#      type: nfs
-#      o: addr=172.31.98.152,rw,nolock
-#      device: ":/volume1/nfs_test"
-#      device: ":/inbound"
-      
+ 
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
       o: addr=192.168.1.209,rw,nolock,noresvport
       device: ":/outbound"
-#      type: nfs
-#      o: addr=172.31.98.152,rw,nolock
-#      device: ":/volume1/nfs_write"
-#      device: ":/outbound"
