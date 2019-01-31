@@ -1,4 +1,4 @@
-from ut_project.celery import app
+from utecode.celery import app
 from time import sleep
 import subprocess
 

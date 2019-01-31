@@ -81,8 +81,8 @@ services:
       replicas: 2
       resources:
         limits:
-          cpus: '1.80'
-          memory: 1000M
+          cpus: '1.20'
+          memory: 1500M
  
 
 # create the 'ute_net' network if it doesn't exist yet
@@ -100,12 +100,12 @@ volumes:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.1.209,rw,nolock,noresvport
+      o: addr=172.16.10.106,rw,nolock,noresvport
       device: ":/inbound"
  
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.1.209,rw,nolock,noresvport
+      o: addr=172.16.10.106,rw,nolock,noresvport
       device: ":/outbound"

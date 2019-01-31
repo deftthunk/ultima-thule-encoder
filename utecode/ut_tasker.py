@@ -149,12 +149,9 @@ state of the task. Handles are stored in 'statusHandles' list for later use.
 '''
 def populateQueue(encodeTasks):
     statusHandles = []
-    taskId = 0
 
     for task in encodeTasks:
-        #statusHandles.append(encode.delay(taskId, task))
         statusHandles.append(encode.delay(task))
-        taskId += 1
         
     return statusHandles
 
@@ -189,7 +186,6 @@ def testEncode(target):
 def main():
     while True:
         files = findWork()
-        print("DEBUG files: ", files)
 
         ## if no files are found, wait 1 minute, then check again
         if len(files) == 0:
@@ -200,9 +196,6 @@ def main():
             frameCountTotal = getFrameCount(targetFile)
             clientCount = getClientCount()
         
-            print("DEBUG frameCountTotal: ", frameCountTotal)
-            print("DEBUG clientCount: ", clientCount)
- 
             ## bug - rabbitmq does not always respond to connection attempts
             if clientCount == 0:
                 clientCount = getClientCount()
@@ -210,12 +203,14 @@ def main():
                 clientCount = getClientCount()
     
             encodeTasks = buildCmdString(files[0], frameCountTotal, clientCount)
-            #encodeTasks = testEncode(files[0])
-            populateQueue(encodeTasks)
-            print("DEBUG encodeTasks: ", encodeTasks)
+            taskHandles = populateQueue(encodeTasks)
 
+
+
+            print("DEBUG encodeTasks: ", encodeTasks)
             print("DEBUG exiting")
             break
+
 
 main()
 
@@ -225,7 +220,7 @@ main()
 >>> i.active()
 >>> i = app.control.inspect()
 >>> i.active()
-{'celery@887bb6b3ba9b': [{'args': '(2,)', 'delivery_info': {'routing_key': 'celery', 'exchange': '', 'redelivered': False, 'priority': 0}, 'hostname': 'celery@887bb6b3ba9b', 'id': 'e0893927-1a30-455b-b73c-b2d01b3ac675', 'kwargs': '{}', 'worker_pid': 14, 'time_start': 1548127895.8416011, 'name': 'ut_project.tasks.testMe', 'type': 'ut_project.tasks.testMe', 'acknowledged': True}], 'celery@71d29c97cead': [], 'celery@a7f5c631d6d7': [], 'celery@c4ffd6300b59': []}
+{'celery@887bb6b3ba9b': [{'args': '(2,)', 'delivery_info': {'routing_key': 'celery', 'exchange': '', 'redelivered': False, 'priority': 0}, 'hostname': 'celery@887bb6b3ba9b', 'id': 'e0893927-1a30-455b-b73c-b2d01b3ac675', 'kwargs': '{}', 'worker_pid': 14, 'time_start': 1548127895.8416011, 'name': 'utecode.tasks.testMe', 'type': 'utecode.tasks.testMe', 'acknowledged': True}], 'celery@71d29c97cead': [], 'celery@a7f5c631d6d7': [], 'celery@c4ffd6300b59': []}
 >>> i.active()
 {'celery@887bb6b3ba9b': [], 'celery@71d29c97cead': [], 'celery@a7f5c631d6d7': [], 'celery@c4ffd6300b59': []}
 

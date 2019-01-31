@@ -2,7 +2,7 @@
 
 ## grab everything needed for the build environment
 apt-get update
-apt-get install -y mercurial cmake cmake-curses-gui build-essential ca-certificates nasm
+apt-get install -y --no-install-recommends mercurial cmake cmake-curses-gui build-essential ca-certificates nasm
 
 ## go to directory where script is located
 parentDir="$(dirname "$0")"

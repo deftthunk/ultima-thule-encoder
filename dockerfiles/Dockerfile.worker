@@ -1,4 +1,4 @@
-FROM debian:testing-slim
+FROM python:3.7-slim-stretch
 
 ## add x265, its shared libraries, and paths
 COPY ./resources/x265/bin/x265 /usr/local/bin/
@@ -8,18 +8,20 @@ COPY ./resources/worker/ld.so.conf /etc/ld.so.conf
 ## install python3, add user 'utbot', and update shared lib path
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
-	python3-pip \
-        python-pip \
-	python3-dev \
-        python-dev \
-	python3-setuptools \
-        python-setuptools \
-	python3-wheel \
-        python-wheel \
-        python3-docker \
-        python-docker \
+#	python3-pip \
+#        python-pip \
+#	python3-dev \
+#        python-dev \
+#	python3-setuptools \
+#        python-setuptools \
+#	python3-wheel \
+#        python-wheel \
+#        python3-docker \
+#        python-docker \
         mediainfo \
         ffmpeg && \
+	apt-get clean && \
+	rm -rf /var/lib/apt/lists/* && \
   useradd -ms /bin/bash utbot && \
   ldconfig
 
@@ -31,7 +33,7 @@ RUN pip3 install celery
 ## add main script loop, UTE python celery code, and
 ## set celery execution path
 COPY ./resources/worker/run.sh /home/utbot/run.sh
-COPY ./ut_project /home/utbot/ut_project
+COPY ./utecode /home/utbot/utecode
 ENV PATH="/home/utbot/.local/bin:${PATH}"
 
 CMD [ "/home/utbot/run.sh" ]

@@ -15,6 +15,6 @@ fi
 
 
 ## bring up docker containers, networking, and volumes as described in
-## docker-compse.yml, deploy it as a "stack" to the swarm, and name the 
+## docker-stack.yml, deploy it as a "stack" to the swarm, and name the 
 ## stack instance 'utestack'
 docker stack deploy --compose-file ./config/docker-stack.yml utestack
