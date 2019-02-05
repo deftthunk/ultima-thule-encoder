@@ -13,6 +13,7 @@
 sleep 60
 
 while true; do
-	python3 -m utecode.ut_tasker
+  sleep 60
+  #python3 -m utecode.ut_tasker
 done
 

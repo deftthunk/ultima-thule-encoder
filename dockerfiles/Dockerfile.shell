@@ -13,6 +13,8 @@ RUN apt-get update && \
         python-pip \
         python-setuptools \
         python-wheel && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
     useradd -ms /bin/bash utbot
 
 ## install docker python

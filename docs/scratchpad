@@ -1,41 +1,19 @@
-apt install python3-pip
-apt install rabbitmq-server
-pip3 install celery flower
-start rabbitmq-server
-add /home/user/.local/bin to PATH
-
-- make sure python project is in a specifically named folder. folder name will be passed to celery for worker execution
-- if using NFS container, host OS must have nfs/nfsd installed
-- if using NFS container, run modprobe nfs on host
-- on bind mounts for volumes, a relative path must start with "./"
-
-celery -A <folder_name> flower
-celery -A <folder_name> worker --loglevel=info
-
-
-INFO:
-rabbitmq server port is 5672
-flower server port is 5555
-
-# "test_celery/run_tasks.py"
-# when run, do not include the filename extension since we're
-# running the module, not the file
-~$ python3 -m test_celery.run_tasks
-
-docker-compose is only for multi-container deployment to a single host
-'docker stack' is for deploying multi-contiainer environments to a swarm
-
-
-#########
- Flower:
-#########
-
-#Download the docker image
-docker pull mher/flower
-#Run the image in the foreground
-docker run --network ute_net mher/flower:latest --broker=amqp://utbot:ultimaThule@172.18.100.2:5672/utbot_vhost
-
-
+##
+## (Re)Setup
+##
+- clean out old containers
+- prune ute volumes
+- check/create folders 'config/keys', 'logs'
+- load config
+- check/build x265
+- check/build rabbitmq
+- check/build worker
+- check/build tasker
+- check for swarm overlay net
+- start registry
+- push worker image
+- deploy swarm
+- 
 
 #################################
  swarm notes (linux only notes):
@@ -46,31 +24,6 @@ docker run --network ute_net mher/flower:latest --broker=amqp://utbot:ultimaThul
   'docker swarm init --advertise-addr <manager-ip>'
   'docker info' for swarm status
   'docker node ls' for node info
-
-- by default, the manager node is itself a worker node
-
-- on each worker node, run following (same output as what docker init gives, but 
-  must include '--advertise-addr' or nodes will not see each other)
-  'docker swarm join --advertise-addr --token <TOKEN> <IP:PORT>' (token was in output from the 'init' command)
-
-- if missing the token, run this on the manager to get it again:
-  'docker swarm join-token worker'
-
-- create/deploy a service for the swarm. this creates 1 running instance, named 'helloswarm, running alpine:latest, with the command "ping docker.com"
-- 'published=' specifies the port to bind on the swarm routing mesh. 'target=' specifies the port inside the service container. 'published=' is what gets exposed to the swarm.
-- if 'published=' is left off, a random high-numbered port is bound for each service task
-- if running multiple tasks per node and publishing ports on 1 or more of those tasks, leave off 'published=' so that docker may assign a unique random port to that container. otherwise there will be port conflict on the node's containers
-- when attaching the swarm to an overlay network, make sure the network is using the "overlay" driver"
-  'docker service create --replicas 3 --publish published=<PUBLISHED-PORT>,target=<CONTAINER-PORT> --network ute-net --name helloswarm alpine ping docker.com'
-
-- short syntax example
-  'docker service create --replicas 3 -p 53:53/udp --name helloswarm alpine ping docker.com'
-
-- publish a new port on an existing service
-  'docker service update --publish-add published=<PUBLISHED-PORT>,target=<CONTAINER-PORT>,protocol=udp <SERVICE>
-
-- using compose file for Ultima Thule Encoder
-  docker stack deploy <name for stack instance>
 
 ##
 ## swarm status commands
@@ -139,6 +92,5 @@ docker run --network ute_net mher/flower:latest --broker=amqp://utbot:ultimaThul
 ## future improvements
 ##
 - private registry using openssl self-signed key
-- shortcut commands for monitoring swarm, adding/removing nodes, etc
 - logging
 

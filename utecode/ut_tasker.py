@@ -1,6 +1,9 @@
 from .tasks import *
+from .timeout import timeout
 import time, re, os
 import subprocess
+import logging
+import json
 
 
 '''
@@ -12,6 +15,22 @@ TODO:
 workFolder = "/inbound"
 outFolder = "/outbound"
 
+#logging.basicConfig(filename='/utelogs/tasker.log', level=logging.WARN, \
+#                    format='%(asctime)s %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s')
+
+
+if __name__ == "__main__":
+    main()
+
+
+## delete all pending tasks in the Broker queue
+def purgeTasks():
+    numDeleted = app.control.purge()
+
+    logging.info("Tasks purged: " + str(numDeleted))
+    return numDeleted
+
 
 ## grab first file found in the NFS 'inbound' folder
 def findWork():
@@ -19,14 +38,24 @@ def findWork():
     for (dirPath, dirNames, fileNames) in os.walk(workFolder):
         listOfFiles += [os.path.join(dirPath, entry) for entry in fileNames]
 
+    logging.info("Files found: " + str(len(listOfFiles)))
     return listOfFiles
 
 
 ## ping Celery clients using the broker container to get a count of 
 ## available workers in the swarm
 def getClientCount():
-    pingRet = app.control.ping(timeout=3.0)
+    pingRet = None
 
+    while True:
+        try:
+            pingRet = app.control.ping(timeout=3.0)
+        except:
+            sleep(1)
+            continue
+        break
+
+    logging.info("Celery Clients: " + str(len(pingRet)))
     return len(pingRet)
 
 
@@ -36,6 +65,7 @@ def getFrameCount(target):
             stdout=subprocess.PIPE)
     match = re.search('Frame count.*?(\d+)', cmdRet.stdout.decode('utf-8'))
 
+    logging.info("Frame Count: " + match.group(1))
     return int(match.group(1))
 
 
@@ -48,8 +78,10 @@ def detectCropping(target):
             'utf-8'))
     
     if match:
+        logging.info("Cropping: " + match.group(1))
         return match.group(1)
     else:
+        logging.info("Cropping: n/a")
         return ''
 
 
@@ -135,6 +167,7 @@ def buildCmdString(target, frameCountTotal, clientCount):
         seek = seek + frames - (frameBufferSize * 2)
         counter += 1
 
+    logging.info("Encode Tasks: " + str(len(encodeTasks)))
     return encodeTasks
 
 
@@ -149,11 +182,15 @@ state of the task. Handles are stored in 'statusHandles' list for later use.
 '''
 def populateQueue(encodeTasks):
     statusHandles = []
+    taskId = 0
 
     for task in encodeTasks:
-        statusHandles.append(encode.delay(task))
-        
+        statusHandles.append(encode.delay(task, taskId))
+        taskId += 1
+ 
+    logging.info("Tasks queued: " + str(len(statusHandles)))
     return statusHandles
+
 
 '''
 Once the queue in RabbitMQ is populated with encoding tasks, use Celery 
@@ -165,54 +202,76 @@ When a task is finished, we check the result, and if sucessful, discard
 it and refresh our active task list. If unsucessful, attempt to resubmit 
 the task to the queue.
 '''
-def waitForTaskCompletion():
-    i = app.control.inspect()
+def waitForTaskCompletion(taskHandles):
+    ## find all celery worker id's
+    workerIds = None
+    while True:
+        try:
+            workerIds = app.control.inspect()
+        except:
+            sleep(1)
+            continue
+        break
 
-    #http://docs.celeryproject.org/en/latest/userguide/workers.html#dump-of-reserved-tasks
+    for worker in workerIds:
+        logging.debug("Worker: " + worker)
+
+        ## wait on tasks
+        for handle in taskHandles:
+            workerDict = handle.active()
+        
+            if handle.ready():
+                for worker,task in workerDict:
+                    logging.debug("Worker: " + worker)
+                    logging.debug("Task ID: " + task[0]['id'])
 
 
-def testEncode(target):
-    encodeTasks = []
+
+@timeout(15)
+def testPopulateQueue(target):
+    taskHandles = []
     counter = 0
     
-    while counter < 10:
-        cmdString = "gzip --fast -k -c {tr} > /outbound/{ctr}file.gz".format(tr = target, ctr = counter)
-        encodeTasks.append(cmdString)
+    while counter < 100:
+        cmdString = "sleep 30"
+        taskHandles.append(encode.delay(cmdString))
         counter += 1
 
-    return encodeTasks
+    return taskHandles
 
 
 def main():
     while True:
         files = findWork()
 
-        ## if no files are found, wait 1 minute, then check again
+        ## check for files and clients
         if len(files) == 0:
+            logging.debug("No files, sleeping")
+            sleep(10)
+            continue
+        if getClientCount() == 0:
+            logging.debug("No clients, sleeping")
             sleep(10)
             continue
 
+        ## work through files found
         for targetFile in files:
-            frameCountTotal = getFrameCount(targetFile)
+            ## check if client list has changed
             clientCount = getClientCount()
-        
-            ## bug - rabbitmq does not always respond to connection attempts
             if clientCount == 0:
-                clientCount = getClientCount()
-                sleep(1)
-                clientCount = getClientCount()
-    
+                logging.debug("No clients, sleeping")
+                sleep(10)
+                break
+
+            frameCountTotal = getFrameCount(targetFile)
             encodeTasks = buildCmdString(files[0], frameCountTotal, clientCount)
-            taskHandles = populateQueue(encodeTasks)
+            taskHandles = testPopulateQueue(encodeTasks)
+            waitForTaskCompletion(taskHandles)
 
 
-
-            print("DEBUG encodeTasks: ", encodeTasks)
-            print("DEBUG exiting")
+            logging.debug("encodeTasks: ", str(len(encodeTasks)))
             break
 
-
-main()
 
 
 

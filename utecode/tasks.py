@@ -7,7 +7,7 @@ def encode(cmd):
     status = subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT, \
             stdout=subprocess.PIPE)
 
-    return (status.returncode, status.stdout)
+    return status.returncode
         
 @app.task
 def testMe(arg):

@@ -1,4 +1,4 @@
-FROM debian:stretch-slim
+FROM python:3.6-slim-stretch
 
 ## install python3, add user 'utbot', and update shared lib path
 RUN apt-get update && \
@@ -19,7 +19,7 @@ RUN apt-get update && \
 ## become user 'utbot', change working dir, install Celery
 USER utbot
 WORKDIR /home/utbot
-RUN pip3 install celery
+RUN pip3 install celery --user
 
 COPY ./utecode /home/utbot/utecode
 ENV PATH="/home/utbot/.local/bin:${PATH}"
