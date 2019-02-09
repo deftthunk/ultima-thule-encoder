@@ -3,7 +3,6 @@ from .timeout import timeout
 import time, re, os
 import subprocess
 import logging
-import json
 
 
 '''
@@ -15,9 +14,7 @@ TODO:
 workFolder = "/inbound"
 outFolder = "/outbound"
 
-#logging.basicConfig(filename='/utelogs/tasker.log', level=logging.WARN, \
-#                    format='%(asctime)s %(message)s')
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
 
 if __name__ == "__main__":
@@ -25,6 +22,7 @@ if __name__ == "__main__":
 
 
 ## delete all pending tasks in the Broker queue
+@timeout(60)
 def purgeTasks():
     numDeleted = app.control.purge()
 
@@ -180,16 +178,16 @@ the ffmpeg task.
 'encode.delay()' returns a handle to that task with methods for determing the 
 state of the task. Handles are stored in 'statusHandles' list for later use.
 '''
+@timeout(60)
 def populateQueue(encodeTasks):
-    statusHandles = []
-    taskId = 0
+    taskHandles = {}
 
     for task in encodeTasks:
-        statusHandles.append(encode.delay(task, taskId))
-        taskId += 1
+        ret = encode.delay(task)
+        taskHandles[ret.task_id] = ret
  
-    logging.info("Tasks queued: " + str(len(statusHandles)))
-    return statusHandles
+    logging.info("Tasks queued: " + str(len(taskHandles)))
+    return taskHandles
 
 
 '''
@@ -207,36 +205,107 @@ def waitForTaskCompletion(taskHandles):
     workerIds = None
     while True:
         try:
-            workerIds = app.control.inspect()
+            workerTaskingDict = app.control.inspect().active()
+            if len(workerTaskingDict) < 1:
+                continue
         except:
             sleep(1)
             continue
         break
 
-    for worker in workerIds:
-        logging.debug("Worker: " + worker)
-
-        ## wait on tasks
-        for handle in taskHandles:
-            workerDict = handle.active()
+    '''
+    while dict 'taskHandles' has items, loop over every Celery worker and every
+    task/thread each worker has (by default 1 per worker). grab the task ID of
+    the current task that worker has, and find it in 'taskHandles' dict. Use
+    the dict value to check the status of the task with the object's ".ready()"
+    method. When true, delete task entry from dict.
+    
+    layout of workerTaskingDict:
+    {
+        'celery@caff7e415107': [], 
+        'celery@87eaf40ea151': [
+        {
+            'id': 'bb82ac8d-f32e-44f6-8051-e7d949ab9679', 
+            'name': 'utecode.tasks.encode', 
+            'args': "
+            (
+                'sleep 30',
+            )", 
+            'kwargs': '{}', 
+            'type': 'utecode.tasks.encode', 
+            'hostname': 'celery@87eaf40ea151', 
+            'time_start': 1549599207.44921, 
+            'acknowledged': True, 
+            'delivery_info': 
+            {
+                'exchange': '', 
+                'routing_key': 'celery', 
+                'priority': 0, 
+                'redelivered': None
+            }, 
+            'worker_pid': 11
+        }]
+    }
+    
+    ''' 
+    taskList = []
+    while len(taskHandles) > 0:
+        workerTaskingDict = app.control.inspect().active()
+        for worker in workerTaskingDict.keys():
+            logging.debug("Worker: " + worker)
+            ## wait on tasks
+            for taskItem in workerTaskingDict[worker]:
+                taskList.append(taskItem['id'])
         
-            if handle.ready():
-                for worker,task in workerDict:
-                    logging.debug("Worker: " + worker)
-                    logging.debug("Task ID: " + task[0]['id'])
+        flag = True
+        while flag:
+            for task in taskList:
+                if taskHandles[task].ready():
+                    logging.info("Result: " + str(taskHandles[task].result))
+                    del taskHandles[task]
+                    taskList.remove(task)
+                    flag = False
+                    logging.info("Completed task " + task)
+                    break
+
+                sleep(2)
 
 
 
-@timeout(15)
+'''
+    while len(taskHandles) > 0:
+        for worker in workerTaskingDict.keys():
+            logging.debug("Worker: " + worker)
+
+            ## wait on tasks
+            for handle in workerTaskingDict[worker]:
+                currentTask = handle['id']
+
+                if taskHandles[currentTask].ready():
+                    del taskHandles[currentTask]
+                    workerIds = app.control.inspect().active()
+                    logging.info("Completed task " + currentTask)
+                    break
+
+            sleep(1)
+            break
+
+        sleep(1)
+'''
+
+
+@timeout(60)
 def testPopulateQueue(target):
-    taskHandles = []
+    taskHandles = {}
     counter = 0
     
     while counter < 100:
         cmdString = "sleep 30"
-        taskHandles.append(encode.delay(cmdString))
+        ret = encode.delay(cmdString)
+        taskHandles[ret.task_id] = ret
         counter += 1
 
+    logging.info("Tasks queued: " + str(len(taskHandles)))
     return taskHandles
 
 
@@ -264,7 +333,7 @@ def main():
                 break
 
             frameCountTotal = getFrameCount(targetFile)
-            encodeTasks = buildCmdString(files[0], frameCountTotal, clientCount)
+            encodeTasks = buildCmdString(targetFile, frameCountTotal, clientCount)
             taskHandles = testPopulateQueue(encodeTasks)
             waitForTaskCompletion(taskHandles)
 

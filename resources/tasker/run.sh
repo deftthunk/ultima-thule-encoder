@@ -1,8 +1,8 @@
 #!/bin/bash
 
 ## runs Celery python file 'utecode/ut_tasker.py' as a python module. we
-## wait a minute for the docker swarm services (namely RabbitMQ) to finish
-## standing up before starting the Python / Celery program.
+## wait a minute for the docker swarm services to finish standing up before 
+## starting the Python / Celery program.
 ##
 ## the 'utecode' referenced below is a copy of the python code in this 
 ## project, built into the 'tasker' docker image before it was deployed 

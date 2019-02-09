@@ -1,17 +1,12 @@
 version: '3.5'
 services:
 
-  ## RabbitMQ server image is built and deployed
-  ## relies on rabbitmq:alpine image
-  rabbitmq:
-    image: ute:rabbitmq
+  ## Redis database and message broker for Celery
+  redis:
+    image: ute:redis
     ports:
-      - target: 5672
-        published: 5672
-        protocol: tcp
-        mode: ingress
-      - target: 15672
-        published: 15672
+      - target: 6379
+        published: 6379
         protocol: tcp
         mode: ingress
     deploy:
@@ -27,10 +22,10 @@ services:
   ## connection
   flower:
     depends_on:
-      - "rabbitmq"
+      - "redis"
     image: mher/flower:latest
-    command: "--broker=amqp://utbot:ultimaThule@rabbitmq:5672/utbot_vhost
-              --broker-api=http://utbot:ultimaThule@rabbitmq:15672/api/"
+    command: "--broker=redis://redis:6379/0
+              --broker-api=http://redis:6379/0"
     deploy:
       replicas: 1
       placement:
@@ -49,7 +44,7 @@ services:
   ## also responsible for building final video file
   tasker:
     depends_on:
-      - "rabbitmq"
+      - "redis"
     image: ute:tasker
     volumes:
       - "nfs-in:/inbound"
@@ -69,7 +64,7 @@ services:
   ## for more control per worker (same goes for memory)
   worker:
     depends_on:
-      - "rabbitmq"
+      - "redis"
     image: ute:worker
     volumes:
       - "nfs-in:/inbound"
@@ -78,11 +73,11 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 2
+      replicas: 3
       resources:
         limits:
           cpus: '1.00'
-          memory: 1500M
+          memory: 500M
  
 
 # create the 'ute_net' network if it doesn't exist yet
@@ -100,12 +95,12 @@ volumes:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.2.186,rw,nolock,noresvport
+      o: addr=192.168.1.252,rw,nolock,noresvport
       device: ":/inbound"
  
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.2.186,rw,nolock,noresvport
+      o: addr=192.168.1.252,rw,nolock,noresvport
       device: ":/outbound"

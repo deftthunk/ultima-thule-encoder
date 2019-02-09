@@ -3,11 +3,6 @@ FROM python:3.6-slim-stretch
 ## install python3, add user 'utbot', and update shared lib path
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
-		python3-pip \
-		python3-dev \
-		python3-setuptools \
-		python3-wheel \
-		python3-docker \
 		mediainfo \
 		vim \ 
 		ffmpeg && \
@@ -20,6 +15,8 @@ RUN apt-get update && \
 USER utbot
 WORKDIR /home/utbot
 RUN pip3 install celery --user
+RUN pip3 install "celery[redis]" --user
+RUN pip3 install redis --user
 
 COPY ./utecode /home/utbot/utecode
 ENV PATH="/home/utbot/.local/bin:${PATH}"

@@ -2,12 +2,12 @@
 
 ## give docker-compose time to spin up rabbitmq before celery 
 ## tries to connect
-echo "Waiting for RabbitMQ to start up."
+echo "Waiting for Broker to start up."
 echo "Sleeping 45 seconds"
 sleep 45
 
 ## runs Celery python code as a worker, which will reach out and connect to
-## the configured RabbitMQ service. the 'utecode' referenced below is a copy
+## the configured broker (Redis) service. the 'utecode' referenced below is a copy
 ## of the python code in this project, built into the worker docker image
 ## before it was deployed to the docker swarm. this bash script is also 
 ## copied into that image and placed in "/home/utbot/" and executed. Changes
@@ -30,5 +30,5 @@ sleep 45
 ## file for the worker image.
 while true; do
   celery -A utecode worker --time-limit=3600 --loglevel=info --concurrency=1
-  sleep 15
+  sleep 10
 done

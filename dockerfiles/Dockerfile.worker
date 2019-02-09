@@ -5,19 +5,9 @@ COPY ./resources/x265/bin/x265 /usr/local/bin/
 COPY ./resources/x265/bin/libx265* /usr/local/lib/
 COPY ./resources/worker/ld.so.conf /etc/ld.so.conf
 
-## install python3, add user 'utbot', and update shared lib path
+## install packages, add user 'utbot', and update shared lib path
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
-#       python3-pip \
-#       python-pip \
-#       python3-dev \
-#       python-dev \
-#	python3-setuptools \
-#       python-setuptools \
-#       python3-wheel \
-#       python-wheel \
-#       python3-docker \
-#       python-docker \
         apt-utils \
         mediainfo \
         ffmpeg && \
@@ -30,6 +20,8 @@ RUN apt-get update && \
 USER utbot
 WORKDIR /home/utbot
 RUN pip3 install celery --user
+RUN pip3 install "celery[redis]" --user
+RUN pip3 install redis --user
 
 ## add main script loop, UTE python celery code, and
 ## set celery execution path
