@@ -73,11 +73,11 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 3
+      replicas: 2
       resources:
         limits:
           cpus: '1.00'
-          memory: 500M
+          memory: 600M
  
 
 # create the 'ute_net' network if it doesn't exist yet

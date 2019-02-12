@@ -1,5 +1,6 @@
 from .tasks import *
 from .timeout import timeout
+from celery.result import ResultSet
 import time, re, os
 import subprocess
 import logging
@@ -104,7 +105,7 @@ frames -- number of frames to encode between two 'frameBufferSize' amounts
 def buildCmdString(target, frameCountTotal, clientCount):
     encodeTasks = []
     frameBufferSize = 100
-    jobCount = clientCount * 1200
+    jobCount = clientCount * 1500
     jobSize = int(round(frameCountTotal / jobCount) + 1)
     crop = detectCropping(target)
     if crop != '':
@@ -128,7 +129,6 @@ def buildCmdString(target, frameCountTotal, clientCount):
                 -1 \
                 -f yuv4mpegpipe - | x265 - \
                 --log-level error \
-                --no-progress \
                 --no-open-gop \
                 --seek {sk} \
                 --frames {fr} \
@@ -180,14 +180,16 @@ state of the task. Handles are stored in 'statusHandles' list for later use.
 '''
 @timeout(60)
 def populateQueue(encodeTasks):
+    r = ResultSet([])
     taskHandles = {}
 
     for task in encodeTasks:
         ret = encode.delay(task)
+        r.add(ret)
         taskHandles[ret.task_id] = ret
  
     logging.info("Tasks queued: " + str(len(taskHandles)))
-    return taskHandles
+    return taskHandles, r
 
 
 '''
@@ -272,41 +274,11 @@ def waitForTaskCompletion(taskHandles):
 
 
 
-'''
-    while len(taskHandles) > 0:
-        for worker in workerTaskingDict.keys():
-            logging.debug("Worker: " + worker)
-
-            ## wait on tasks
-            for handle in workerTaskingDict[worker]:
-                currentTask = handle['id']
-
-                if taskHandles[currentTask].ready():
-                    del taskHandles[currentTask]
-                    workerIds = app.control.inspect().active()
-                    logging.info("Completed task " + currentTask)
-                    break
-
-            sleep(1)
-            break
-
-        sleep(1)
-'''
-
-
-@timeout(60)
-def testPopulateQueue(target):
-    taskHandles = {}
-    counter = 0
+def testCallback(taskId, result):
+    print("I got called!")
+    logging.info("TaskID: " + taskId)
+    logging.info("Result: " + str(result))
     
-    while counter < 100:
-        cmdString = "sleep 30"
-        ret = encode.delay(cmdString)
-        taskHandles[ret.task_id] = ret
-        counter += 1
-
-    logging.info("Tasks queued: " + str(len(taskHandles)))
-    return taskHandles
 
 
 def main():
@@ -334,37 +306,15 @@ def main():
 
             frameCountTotal = getFrameCount(targetFile)
             encodeTasks = buildCmdString(targetFile, frameCountTotal, clientCount)
-            taskHandles = testPopulateQueue(encodeTasks)
-            waitForTaskCompletion(taskHandles)
+            taskHandles, retSet = populateQueue(encodeTasks)
+            retSet.join(callback=testCallback)
+#            waitForTaskCompletion(taskHandles)
 
 
             logging.debug("encodeTasks: ", str(len(encodeTasks)))
             break
+        
+        sleep(3600)
 
 
 
-
-'''
->>> i.active()
->>> i = app.control.inspect()
->>> i.active()
-{'celery@887bb6b3ba9b': [{'args': '(2,)', 'delivery_info': {'routing_key': 'celery', 'exchange': '', 'redelivered': False, 'priority': 0}, 'hostname': 'celery@887bb6b3ba9b', 'id': 'e0893927-1a30-455b-b73c-b2d01b3ac675', 'kwargs': '{}', 'worker_pid': 14, 'time_start': 1548127895.8416011, 'name': 'utecode.tasks.testMe', 'type': 'utecode.tasks.testMe', 'acknowledged': True}], 'celery@71d29c97cead': [], 'celery@a7f5c631d6d7': [], 'celery@c4ffd6300b59': []}
->>> i.active()
-{'celery@887bb6b3ba9b': [], 'celery@71d29c97cead': [], 'celery@a7f5c631d6d7': [], 'celery@c4ffd6300b59': []}
-
-
-'''
-
-'''
->>> ret = testMe.delay(2)
->>> ret.ready()
-True
->>> ret.result()
-Traceback (most recent call last):
-  File "<stdin>", line 1, in <module>
-TypeError: 'int' object is not callable
->>>
->>>
->>> ret.result  
-2
-'''
