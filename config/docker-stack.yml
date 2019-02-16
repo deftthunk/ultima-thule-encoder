@@ -1,7 +1,8 @@
 version: '3.5'
 services:
 
-  ## Redis database and message broker for Celery
+  ## Redis database and message broker for Celery. don't modify unless you know
+  ## what you're doing
   redis:
     image: ute:redis
     ports:
@@ -17,9 +18,11 @@ services:
       ute_net:
 
 
-  ## defines the flower container for monitoring RabbitMQ
-  ## flower will wait for rabbitmq to start first, and then attempt
-  ## connection
+  ## defines the flower container for monitoring RabbitMQ flower will wait for 
+  ## rabbitmq to start first, and then attempt connection.
+  ##
+  ## by default, this runs on the swarm manager machine, but doesn't need to.
+  ## just has to punch a hole in the network to be reachable by web browser
   flower:
     depends_on:
       - "redis"
@@ -39,9 +42,9 @@ services:
       ute_net:
 
 
-  ## tasker drives the worker tasking by building jobs from
-  ## files and distributing the jobs as tasks via RabbitMQ.
-  ## also responsible for building final video file
+  ## tasker drives the worker tasking by building jobs from files and 
+  ## distributing the jobs as tasks via RabbitMQ. also responsible for 
+  ## building final video file
   tasker:
     depends_on:
       - "redis"
@@ -57,12 +60,19 @@ services:
         constraints: [node.role == manager]
  
 
-  ## defines a task to run the celery worker container in.
-  ## these tasks are replicated through the docker swarm nodes
-  ## the 'cpus' key reflects how much cputime each worker is allowed
-  ## to consume on the host. remove for auto-allocation, or dial in
-  ## for more control per worker (same goes for memory)
-  worker:
+  ## defines a task to run the celery worker container in. these tasks are 
+  ## replicated through the docker swarm nodes the 'cpus' key reflects how 
+  ## much cputime each worker is allowed to consume on the host. remove for 
+  ## auto-allocation, or dial in for more control per worker (same for memory).
+  ##
+  ## a worker service can be defined for each host (and resources customized 
+  ## accordingly), if you create another worker service named something else
+  ## (like 'worker-server2'), and then under placement.constraints, add the
+  ## name of the label you gave that system (accomplished by doing something
+  ## like 'docker node update --label-add name=server2 <node_name>'). see 
+  ## https://docs.docker.com/engine/reference/commandline/service_update/ for
+  ## details.
+  worker-laptop:
     depends_on:
       - "redis"
     image: ute:worker
@@ -74,13 +84,48 @@ services:
     deploy:
       mode: replicated
       replicas: 2
+      placement:
+        constraints:
+          - node.labels.name == lenovo_x1
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 750M
+
+
+  ## worker service with resource values for a different system. service name
+  ## must be different from other worker service.
+  worker-desktop:
+    depends_on:
+      - "redis"
+    image: ute:worker
+    volumes:
+      - "nfs-in:/inbound"
+      - "nfs-out:/outbound"
+    networks:
+      ute_net:
+    deploy:
+      mode: replicated
+      replicas: 0
+      placement:
+        constraints:
+          - node.labels.name == station1
       resources:
         limits:
           cpus: '1.00'
-          memory: 600M
- 
+          memory: 750M
 
-# create the 'ute_net' network if it doesn't exist yet
+
+  ## global service (one service instance per swarm host) to build x265 in a
+  ## local volume, to be accessed by any local container
+  #x265-builder:
+    #image: ute:x265-builder
+    #volumes:
+      #- 
+
+
+## create the 'ute_net' network if it doesn't exist yet. this is a docker 
+## swarm "overlay" network that all services described here will be attached to
 networks:
   ute_net:
     name: ute_net
@@ -89,18 +134,22 @@ networks:
 
 
 ## point participating containers (namely the workers) at the NFS container
-## we setup up above, as a "local volume"
+## we setup up above, as a "local volume".
+##
+## WARNING: if your NFS settings change for some reason, you must run "docker 
+## volume rm <nfs volumes>" on each physical node in the swarm to remove the 
+## old NFS mounts. otherwise new NFS settings will not take effect.
 volumes:
   nfs-in:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.1.252,rw,nolock,noresvport
+      o: addr=172.31.98.151,rw,nolock,noresvport
       device: ":/inbound"
  
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.1.252,rw,nolock,noresvport
+      o: addr=172.31.98.151,rw,nolock,noresvport
       device: ":/outbound"

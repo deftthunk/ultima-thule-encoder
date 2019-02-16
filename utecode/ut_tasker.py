@@ -15,7 +15,7 @@ TODO:
 workFolder = "/inbound"
 outFolder = "/outbound"
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s')
 
 
 if __name__ == "__main__":
@@ -58,14 +58,38 @@ def getClientCount():
     return len(pingRet)
 
 
-## use 'mediainfo' tool to determine number of frames
+## find the number of frames in the video. this can be error prone, so multiple
+## methods are attempted
 def getFrameCount(target):
-    cmdRet = subprocess.run(["mediainfo", "--fullscan", target], \
-            stdout=subprocess.PIPE)
-    match = re.search('Frame count.*?(\d+)', cmdRet.stdout.decode('utf-8'))
+    frameCount = None
 
-    logging.info("Frame Count: " + match.group(1))
-    return int(match.group(1))
+    ## attempting mediainfo method
+    mediaRet = subprocess.run(["mediainfo", "--fullscan", target], \
+            stdout=subprocess.PIPE)
+    mediaMatch = re.search('Frame count.*?(\d+)', mediaRet.stdout.decode('utf-8'))
+
+    ## if we cant find a frame count, we'll do it the hard way and count frames
+    ## using ffprobe. this can end up being the case if the MKV stream is
+    ## variable frame rate
+    if mediaMatch == None:
+        ffprobeRet = subprocess.run(["ffprobe", \
+            "-v", \
+            "error", \
+            "-count_frames", \
+            "-select_streams", \
+            "v:0", \
+            "-show_entries", \
+            "stream=nb_read_frames", \
+            "-of", \
+            "default=nokey=1:noprint_wrappers=1", \
+            target], stdout=subprocess.PIPE)
+
+        frameCount = ffprobeRet.stdout.decode('utf-8')
+    else:
+        frameCount = mediaMatch.group(1)
+
+    logging.info("Frame Count: " + str(frameCount))
+    return int(frameCount)
 
 
 ## use ffmpeg to detect video cropping in target sample
@@ -105,7 +129,7 @@ frames -- number of frames to encode between two 'frameBufferSize' amounts
 def buildCmdString(target, frameCountTotal, clientCount):
     encodeTasks = []
     frameBufferSize = 100
-    jobCount = clientCount * 1500
+    jobCount = 100
     jobSize = int(round(frameCountTotal / jobCount) + 1)
     crop = detectCropping(target)
     if crop != '':
@@ -116,6 +140,10 @@ def buildCmdString(target, frameCountTotal, clientCount):
     counter, seek, chunkStart = 0, 0, 0
     chunkEnd = jobSize - 1
     frames = jobSize + frameBufferSize
+
+    logging.debug("jobCount / jobSize / frameCountTotal: " + str(jobCount) + \
+            str(jobSize) + \
+            str(frameCountTotal))
 
     ## ffmpeg and x265 CLI args, with placeholder variables defined in the 
     ## .format() method below
@@ -158,6 +186,8 @@ def buildCmdString(target, frameCountTotal, clientCount):
 
         ## push built CLI command onto end of list
         encodeTasks.append(ffmpegStr)
+        ## if debugging, cut out excess spaces from command string
+        logging.debug(' '.join(ffmpegStr.split()))
 
         chunkStart = frameBufferSize
         chunkEnd = chunkStart + jobSize - 1
@@ -178,7 +208,7 @@ the ffmpeg task.
 'encode.delay()' returns a handle to that task with methods for determing the 
 state of the task. Handles are stored in 'statusHandles' list for later use.
 '''
-@timeout(60)
+@timeout(300)
 def populateQueue(encodeTasks):
     r = ResultSet([])
     taskHandles = {}
@@ -275,11 +305,9 @@ def waitForTaskCompletion(taskHandles):
 
 
 def testCallback(taskId, result):
-    print("I got called!")
     logging.info("TaskID: " + taskId)
     logging.info("Result: " + str(result))
     
-
 
 def main():
     while True:
@@ -311,10 +339,12 @@ def main():
 #            waitForTaskCompletion(taskHandles)
 
 
-            logging.debug("encodeTasks: ", str(len(encodeTasks)))
+            logging.debug("encodeTasks: ", len(encodeTasks))
             break
         
-        sleep(3600)
+        logging.info("\nFinished " + files[0])
+        sleep(10)
+        break
 
 
 

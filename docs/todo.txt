@@ -1,0 +1,8 @@
+- asynchronously prep the next video file for encoding. especially useful if
+  there's a file with VFR that we need to count frames on in the background
+
+- make async function to determine average fps being encoded on swarm
+
+- make x265-builder image for global deployment
+
+- figure out windows madness

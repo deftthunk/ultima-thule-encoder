@@ -1,4 +1,5 @@
-FROM python:3.6-slim-stretch
+#FROM python:3.6-slim-stretch
+FROM debian:stretch-slim
 
 ## add x265, its shared libraries, and paths
 COPY ./resources/x265/bin/x265 /usr/local/bin/
@@ -8,6 +9,10 @@ COPY ./resources/worker/ld.so.conf /etc/ld.so.conf
 ## install packages, add user 'utbot', and update shared lib path
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
+        python3-pip \
+        python3-setuptools \
+        python3-wheel \
+        python3-dev \
         apt-utils \
         mediainfo \
         ffmpeg && \

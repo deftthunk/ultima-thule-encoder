@@ -1,8 +1,13 @@
-FROM python:3.6-slim-stretch
+#FROM python:3.6-slim-stretch
+FROM debian:stretch-slim
 
 ## install python3, add user 'utbot', and update shared lib path
 RUN apt-get update && \
   apt-get install -y --no-install-recommends \
+                python3-pip \
+                python3-setuptools \
+                python3-wheel \
+                python3-dev \
 		mediainfo \
 		vim \ 
 		ffmpeg && \
