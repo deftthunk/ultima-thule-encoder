@@ -1,7 +1,7 @@
 from .tasks import *
 from .timeout import timeout
 from celery.result import ResultSet
-import time, re, os
+import time, re, os, math
 import subprocess
 import logging
 
@@ -72,6 +72,7 @@ def getFrameCount(target):
     ## using ffprobe. this can end up being the case if the MKV stream is
     ## variable frame rate
     if mediaMatch == None:
+        logging.info("Using ffprobe")
         ffprobeRet = subprocess.run(["ffprobe", \
             "-v", \
             "error", \
@@ -130,7 +131,8 @@ def buildCmdString(target, frameCountTotal, clientCount):
     encodeTasks = []
     frameBufferSize = 100
     jobCount = 100
-    jobSize = int(round(frameCountTotal / jobCount) + 1)
+    jobSize = int(math.ceil(frameCountTotal / jobCount))
+
     crop = detectCropping(target)
     if crop != '':
         tempCrop = crop
@@ -141,8 +143,8 @@ def buildCmdString(target, frameCountTotal, clientCount):
     chunkEnd = jobSize - 1
     frames = jobSize + frameBufferSize
 
-    logging.debug("jobCount / jobSize / frameCountTotal: " + str(jobCount) + \
-            str(jobSize) + \
+    logging.debug("jobCount / jobSize / frameCountTotal: " + str(jobCount) + "/" + \
+            str(jobSize) + "/" + \
             str(frameCountTotal))
 
     ## ffmpeg and x265 CLI args, with placeholder variables defined in the 
@@ -190,9 +192,20 @@ def buildCmdString(target, frameCountTotal, clientCount):
         logging.debug(' '.join(ffmpegStr.split()))
 
         chunkStart = frameBufferSize
-        chunkEnd = chunkStart + jobSize - 1
-        frames = jobSize + (frameBufferSize * 2)
-        seek = seek + frames - (frameBufferSize * 2)
+        if counter == 0:
+          seek = jobSize - chunkStart
+        else:
+          seek = seek + jobSize
+
+        ## if we're about to encode past EOF, set chunkEnd to finish on the 
+        ## last frame, and adjust 'frames' accordingly. else, continue
+        if (seek + (frameBufferSize * 2) + jobSize) > frameCountTotal:
+          chunkEnd = frameCountTotal - seek
+          frames = chunkEnd
+        else:
+          chunkEnd = chunkStart + jobSize - 1
+          frames = jobSize + (frameBufferSize * 2)
+
         counter += 1
 
     logging.info("Encode Tasks: " + str(len(encodeTasks)))
@@ -309,6 +322,9 @@ def testCallback(taskId, result):
     logging.info("Result: " + str(result))
     
 
+def rebuildVideo():
+
+
 def main():
     while True:
         files = findWork()
@@ -339,7 +355,6 @@ def main():
 #            waitForTaskCompletion(taskHandles)
 
 
-            logging.debug("encodeTasks: ", len(encodeTasks))
             break
         
         logging.info("\nFinished " + files[0])

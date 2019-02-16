@@ -86,10 +86,10 @@ services:
       replicas: 2
       placement:
         constraints:
-          - node.labels.name == lenovo_x1
+          - node.labels.name == trainer
       resources:
         limits:
-          cpus: '1.50'
+          cpus: '2.00'
           memory: 750M
 
 
@@ -106,7 +106,7 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 3
       placement:
         constraints:
           - node.labels.name == station1
@@ -144,12 +144,12 @@ volumes:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=172.31.98.151,rw,nolock,noresvport
+      o: addr=192.168.2.4,rw,nolock,noresvport
       device: ":/inbound"
  
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=172.31.98.151,rw,nolock,noresvport
+      o: addr=192.168.2.4,rw,nolock,noresvport
       device: ":/outbound"
