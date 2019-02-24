@@ -4,12 +4,15 @@ import re
 import logging
 import subprocess
 
-#logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
 
-@app.task
-def encode(cmd):
+## take a CLI command from the task and execute it via subprocess module
+## the decorator '@app.task' enables retrying for failed tasks which
+## will be seen in Flower
+@app.task(bind=True, autoretry_for=(Exception,), \
+    retry_kwargs={'max_retries': 5, 'countdown': 3})
+def encode(self, cmd):
     status = subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT, \
             stdout=subprocess.PIPE)
 
@@ -24,6 +27,12 @@ def encode(cmd):
 ## to be the average processing speed of the node its running on
 def parseFPS(string):
     fps = re.findall(r'\s(\d+\.\d+)\sfps', string.decode('utf-8'))
+
+    ## debugging stuff
+    logging.debug("cmd output: " + str(string.decode('utf-8')))
     logging.debug("fps size: " + str(len(fps)))
     
-    return fps[-1]
+    if len(fps) > 0:
+        return fps[-1]
+    else:
+        return 00

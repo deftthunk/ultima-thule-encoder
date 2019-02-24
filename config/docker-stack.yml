@@ -89,8 +89,8 @@ services:
           - node.labels.name == trainer
       resources:
         limits:
-          cpus: '2.00'
-          memory: 750M
+          cpus: '1.5'
+          memory: 500M
 
 
   ## worker service with resource values for a different system. service name
@@ -106,14 +106,37 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 3
+      replicas: 2
       placement:
         constraints:
           - node.labels.name == station1
       resources:
         limits:
-          cpus: '1.00'
-          memory: 750M
+          cpus: '1.5'
+          memory: 500M
+
+
+  ## worker service with resource values for a different system. service name
+  ## must be different from other worker service.
+  worker-other:
+    depends_on:
+      - "redis"
+    image: ute:worker
+    volumes:
+      - "nfs-in:/inbound"
+      - "nfs-out:/outbound"
+    networks:
+      ute_net:
+    deploy:
+      mode: replicated
+      replicas: 0
+      placement:
+        constraints:
+          - node.labels.name == laptop
+      resources:
+        limits:
+          cpus: '1.25'
+          memory: 1000M
 
 
   ## global service (one service instance per swarm host) to build x265 in a

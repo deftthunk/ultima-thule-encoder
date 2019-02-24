@@ -58,6 +58,23 @@ def getClientCount():
     return len(pingRet)
 
 
+## return the base name of a filepath. if no arg given, return the name of
+## the current file
+def getFileName(name=None):
+    fileName = ''
+    if name == None:
+        logging.debug("No args, finding new work")
+        currentFileList = findWork()
+        if len(currentFileList) > 0:
+            fileName = os.path.basename(currentFileList[0])
+        else:
+            logging.error("No files in queue")
+    else:
+        fileName = os.path.basename(name)
+
+    return fileName
+
+
 ## find the number of frames in the video. this can be error prone, so multiple
 ## methods are attempted
 def getFrameCount(target):
@@ -117,31 +134,63 @@ as a task for Celery workers.
 
 << ffmpeg / x265 argument variables >>
 
+fileString -- the name of the file chunk generated: <num>_chunk_<filename>.265
 encodeTasks -- list (array) storing built ffmpeg commands
 frameBufferSize -- frames on either side of 'jobSize' to help prime encoder
 jobCount -- number of task blocks to create for distributing to worker nodes
 crop -- if cropping is present, add flag to ffmpeg. else leave blank string
-jobSize -- number of frames per task, rounded up +1 to ensure full coverage
-counter -- track progress into jobCount
+jobSize -- frames per task; uses ceil() to ensure last task gets full coverage
+counter -- track progress into jobCount, and used to label file chunks
 seek -- position marker in target file for chunks
 chunkStart / chunkEnd -- block of frames that define a 'job'
-frames -- number of frames to encode between two 'frameBufferSize' amounts
+frames -- number of total frames to encode. some will be used just prime encoder
 '''
 def buildCmdString(target, frameCountTotal, clientCount):
     encodeTasks = []
+    fileString = ''
     frameBufferSize = 100
-    jobCount = 100
-    jobSize = int(math.ceil(frameCountTotal / jobCount))
+    jobSize = 200
+    jobCount = int(math.ceil(frameCountTotal / jobSize))
+    counter = 0
 
+    ## build the output string for each chunk
+    def genFileString():
+        nonlocal fileString
+        namePart = ''
+        fileName = getFileName(target)
+
+        ## use part (or all) of the filename to help name chunks
+        if len(fileName) > 10:
+          namePart = fileName[0:9]
+        else:
+          namePart = fileName
+
+        numLen = len(str(jobCount))
+
+        if numLen == 3:
+            fileString = ''.join("{:03d}".format(counter))
+        elif numLen == 4:
+            fileString = ''.join("{:04d}".format(counter))
+        elif numLen == 5:
+            fileString = ''.join("{:05d}".format(counter))
+        elif numLen == 6:
+            fileString = ''.join("{:06d}".format(counter))
+        else:
+            fileString = ''.join("{:07d}".format(counter))
+
+        fileString += "_" + namePart + ".265"
+
+    ## determine if cropping will be included
     crop = detectCropping(target)
     if crop != '':
         tempCrop = crop
         crop = "-filter:v \"{}\"".format(tempCrop)
 
     ## initial values for first loop iteration
-    counter, seek, chunkStart = 0, 0, 0
+    seek, chunkStart = 0, 0
     chunkEnd = jobSize - 1
     frames = jobSize + frameBufferSize
+    genFileString()
 
     logging.debug("jobCount / jobSize / frameCountTotal: " + str(jobCount) + "/" + \
             str(jobSize) + "/" + \
@@ -176,7 +225,7 @@ def buildCmdString(target, frameCountTotal, clientCount):
                 --ctu 16 \
                 --y4m \
                 --pools \"+\" \
-                -o {dst}/chunk{ctr}.265".format( \
+                -o {dst}/{fStr}".format( \
                 tr = target, \
                 cd = crop, \
                 sk = seek, \
@@ -184,7 +233,8 @@ def buildCmdString(target, frameCountTotal, clientCount):
                 cs = chunkStart, \
                 ce = chunkEnd, \
                 ctr = counter, \
-                dst = outFolder)
+                dst = outFolder, \
+                fStr = fileString)
 
         ## push built CLI command onto end of list
         encodeTasks.append(ffmpegStr)
@@ -207,6 +257,7 @@ def buildCmdString(target, frameCountTotal, clientCount):
           frames = jobSize + (frameBufferSize * 2)
 
         counter += 1
+        genFileString()
 
     logging.info("Encode Tasks: " + str(len(encodeTasks)))
     return encodeTasks
@@ -227,12 +278,92 @@ def populateQueue(encodeTasks):
     taskHandles = {}
 
     for task in encodeTasks:
-        ret = encode.delay(task)
-        r.add(ret)
-        taskHandles[ret.task_id] = ret
+        try:
+            ret = encode.delay(task)
+            r.add(ret)
+            logging.debug("Task ID: " + str(ret.task_id))
+            taskHandles[ret.task_id] = ret
+        except:
+            logging.info("populateQueue fail: " + str(task.traceback))
  
     logging.info("Tasks queued: " + str(len(taskHandles)))
     return taskHandles, r
+
+
+def testCallback(taskId, result):
+    logging.info("TaskID: " + taskId)
+    logging.info("Result: " + str(result))
+    
+
+def rebuildVideo(target):
+    dirList = os.listdir(outFolder)
+    dirFiles = [x for x in dirList if x[-4:] == '.265']
+    dirFiles.sort()
+    outFilePath = '/'.join([outFolder, getFileName(target)])
+    cmd = ['mkvmerge', '--output', outFilePath, '[']
+    
+    for chunk in dirFiles:
+        path = '/'.join([outFolder, chunk])
+        cmd.append(path)
+
+    cmd.append(']')
+    cmdString = ' '.join(cmd)
+    os.system(cmdString)
+
+
+def cleanOutFolder(target):
+    dirFiles = os.listdir(outFolder)
+    for entry in dirFiles:
+        if entry[-4:] == '.265':
+            os.remove(''.join([outFolder, '/', entry]))
+
+
+def main():
+    while True:
+        files = findWork()
+
+        ## check for files and clients
+        if len(files) == 0:
+            logging.debug("No files, sleeping")
+            sleep(10)
+            continue
+        if getClientCount() == 0:
+            logging.debug("No clients, sleeping")
+            sleep(10)
+            continue
+
+        ## work through files found
+        for targetFile in files:
+            ## check if client list has changed
+            clientCount = getClientCount()
+            if clientCount == 0:
+                logging.debug("No clients, sleeping")
+                sleep(10)
+                break
+
+            frameCountTotal = getFrameCount(targetFile)
+            encodeTasks = buildCmdString(targetFile, frameCountTotal, clientCount)
+            taskHandles, retSet = populateQueue(encodeTasks)
+
+            logging.info("Waiting on tasks...")
+            retSet.join(callback=testCallback)
+
+            logging.info("Building new Matroska file")
+            rebuildVideo(targetFile)
+
+            logging.info("Clearing out '.265' chunk files")
+            cleanOutFolder(targetFile)
+ 
+        logging.info("\nFinished " + targetFile)
+        sleep(10)
+        break
+
+
+
+
+
+
+
 
 
 '''
@@ -244,7 +375,8 @@ status for results.
 When a task is finished, we check the result, and if sucessful, discard 
 it and refresh our active task list. If unsucessful, attempt to resubmit 
 the task to the queue.
-'''
+
+
 def waitForTaskCompletion(taskHandles):
     ## find all celery worker id's
     workerIds = None
@@ -258,7 +390,7 @@ def waitForTaskCompletion(taskHandles):
             continue
         break
 
-    '''
+
     while dict 'taskHandles' has items, loop over every Celery worker and every
     task/thread each worker has (by default 1 per worker). grab the task ID of
     the current task that worker has, and find it in 'taskHandles' dict. Use
@@ -292,7 +424,6 @@ def waitForTaskCompletion(taskHandles):
         }]
     }
     
-    ''' 
     taskList = []
     while len(taskHandles) > 0:
         workerTaskingDict = app.control.inspect().active()
@@ -314,52 +445,6 @@ def waitForTaskCompletion(taskHandles):
                     break
 
                 sleep(2)
-
-
-
-def testCallback(taskId, result):
-    logging.info("TaskID: " + taskId)
-    logging.info("Result: " + str(result))
-    
-
-def rebuildVideo():
-
-
-def main():
-    while True:
-        files = findWork()
-
-        ## check for files and clients
-        if len(files) == 0:
-            logging.debug("No files, sleeping")
-            sleep(10)
-            continue
-        if getClientCount() == 0:
-            logging.debug("No clients, sleeping")
-            sleep(10)
-            continue
-
-        ## work through files found
-        for targetFile in files:
-            ## check if client list has changed
-            clientCount = getClientCount()
-            if clientCount == 0:
-                logging.debug("No clients, sleeping")
-                sleep(10)
-                break
-
-            frameCountTotal = getFrameCount(targetFile)
-            encodeTasks = buildCmdString(targetFile, frameCountTotal, clientCount)
-            taskHandles, retSet = populateQueue(encodeTasks)
-            retSet.join(callback=testCallback)
-#            waitForTaskCompletion(taskHandles)
-
-
-            break
-        
-        logging.info("\nFinished " + files[0])
-        sleep(10)
-        break
-
+''' 
 
 

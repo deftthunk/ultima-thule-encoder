@@ -6,3 +6,9 @@
 - make x265-builder image for global deployment
 
 - figure out windows madness
+
+- ansible: for redis host, set host system parameters to stop warnings:
+  echo never > /sys/kernel/mm/transparent_hugepage/enabled
+  echo never > /sys/kernel/mm/transparent_hugepage/defrag
+  sudo sysctl vm.overcommit_memory=1
+
