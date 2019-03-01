@@ -2,9 +2,7 @@
 FROM debian:stretch-slim
 
 ## add x265, its shared libraries, and paths
-COPY ./resources/x265/bin/x265 /usr/local/bin/
-COPY ./resources/x265/bin/libx265* /usr/local/lib/
-COPY ./resources/worker/ld.so.conf /etc/ld.so.conf
+COPY ./resources/worker/ute_lib.conf /etc/ld.so.conf.d/ute_lib.conf
 
 ## install packages, add user 'utbot', and update shared lib path
 RUN apt-get update && \
@@ -15,11 +13,14 @@ RUN apt-get update && \
         python3-dev \
         apt-utils \
         mediainfo \
+        gosu \
         ffmpeg && \
 	apt-get clean && \
 	rm -rf /var/lib/apt/lists/* && \
   useradd -ms /bin/bash utbot && \
-  ldconfig
+  mkdir -p /ute/x265
+
+VOLUME [ "/ute/x265" ]
 
 ## become user 'utbot', change working dir, install Celery
 USER utbot
@@ -31,7 +32,12 @@ RUN pip3 install redis --user
 ## add main script loop, UTE python celery code, and
 ## set celery execution path
 COPY ./resources/worker/run.sh /home/utbot/run.sh
+COPY ./resources/worker/run_root.sh /root/run_root.sh
+COPY ./resources/worker/run_root.sh /run_root.sh
 COPY ./utecode /home/utbot/utecode
 ENV PATH="/home/utbot/.local/bin:${PATH}"
+ENV PATH="/ute/x265:${PATH}"
 
-CMD [ "/home/utbot/run.sh" ]
+USER root
+
+CMD [ "/run_root.sh" ]

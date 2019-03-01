@@ -1,18 +1,6 @@
 #!/bin/bash
 
-x265_path="./resources/x265/bin"
 stackName='utestack'
-
-## check for presence of built x265 tool, and kickoff compile process
-## if not found.
-if [[ ! -d $x265_path ]]; then
-  origDir=$(pwd)
-  parentDir=`dirname $x265_path`
-  
-  cd $parentDir
-  `./runme.sh`
-  cd $origDir
-fi
 
 if [[ -z $1 ]] || [[ $1 == 'up' ]]; then
   ## bring up docker containers, networking, and volumes as described in
@@ -22,6 +10,8 @@ if [[ -z $1 ]] || [[ $1 == 'up' ]]; then
 
 elif [[ $1 == 'down' ]]; then
   docker stack rm $stackName
+  sleep 20
+  docker container prune -f
   docker volume rm "$stackName"_nfs-in
   docker volume rm "$stackName"_nfs-out
 fi

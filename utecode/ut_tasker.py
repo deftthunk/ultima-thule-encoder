@@ -12,14 +12,11 @@ TODO:
 - add asyncio functionality for monitoring when celery worker count changes
 - provide Celery worker direct and broadcast control for monitoring
 '''
-workFolder = "/inbound"
-outFolder = "/outbound"
+workFolder = "/ute/inbound"
+outFolder = "/ute/outbound"
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(message)s')
-
-
-if __name__ == "__main__":
-    main()
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+#logging.basicConfig(level=logging.DEBUG)
 
 
 ## delete all pending tasks in the Broker queue
@@ -149,7 +146,7 @@ def buildCmdString(target, frameCountTotal, clientCount):
     encodeTasks = []
     fileString = ''
     frameBufferSize = 100
-    jobSize = 200
+    jobSize = 100
     jobCount = int(math.ceil(frameCountTotal / jobSize))
     counter = 0
 
@@ -249,9 +246,16 @@ def buildCmdString(target, frameCountTotal, clientCount):
 
         ## if we're about to encode past EOF, set chunkEnd to finish on the 
         ## last frame, and adjust 'frames' accordingly. else, continue
+        ##
+        ## if this next chunk is going to be the penultimate chunk, grow the
+        ## job to subsume what would be the last truncated task. this task will
+        ## be larger, but prevents any potential buggy behaviour with having a
+        ## single frame end task. this calculation includes before/after buffer
         if (seek + (frameBufferSize * 2) + jobSize) > frameCountTotal:
           chunkEnd = frameCountTotal - seek
           frames = chunkEnd
+          ## artifically decrement jobCount, since we're subsuming the last task
+          jobCount -= 1
         else:
           chunkEnd = chunkStart + jobSize - 1
           frames = jobSize + (frameBufferSize * 2)
@@ -360,9 +364,8 @@ def main():
 
 
 
-
-
-
+#if __name__ == "__main__":
+#    main()
 
 
 

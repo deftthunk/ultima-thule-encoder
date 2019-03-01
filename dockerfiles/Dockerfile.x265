@@ -1,0 +1,21 @@
+FROM debian:testing-slim
+
+## add x265, its shared libraries, and paths
+COPY ./resources/x265 /data
+
+## install packages, add user 'utbot', and update shared lib path
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+        mercurial \
+        cmake \
+        cmake-curses-gui \
+        build-essential \
+        ca-certificates \
+        nasm && \
+	apt-get clean && \
+	rm -rf /var/lib/apt/lists/* && \
+        mkdir -p /ute/x265
+
+VOLUME [ "/ute/x265" ]
+
+CMD [ "/data/build.sh" ]

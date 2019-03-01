@@ -25,7 +25,7 @@ services:
   ## just has to punch a hole in the network to be reachable by web browser
   flower:
     depends_on:
-      - "redis"
+      - redis
     image: mher/flower:latest
     command: "--broker=redis://redis:6379/0
               --broker-api=http://redis:6379/0"
@@ -47,11 +47,11 @@ services:
   ## building final video file
   tasker:
     depends_on:
-      - "redis"
+      - redis
     image: ute:tasker
     volumes:
-      - "nfs-in:/inbound"
-      - "nfs-out:/outbound"
+      - nfs-in:/ute/inbound
+      - nfs-out:/ute/outbound
     networks:
       ute_net:
     deploy:
@@ -74,16 +74,17 @@ services:
   ## details.
   worker-laptop:
     depends_on:
-      - "redis"
+      - redis
     image: ute:worker
     volumes:
-      - "nfs-in:/inbound"
-      - "nfs-out:/outbound"
+      - nfs-in:/ute/inbound
+      - nfs-out:/ute/outbound
+      - x265-vol:/ute/x265
     networks:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 2
+      replicas: 0
       placement:
         constraints:
           - node.labels.name == trainer
@@ -97,16 +98,17 @@ services:
   ## must be different from other worker service.
   worker-desktop:
     depends_on:
-      - "redis"
+      - redis
     image: ute:worker
     volumes:
-      - "nfs-in:/inbound"
-      - "nfs-out:/outbound"
+      - nfs-in:/ute/inbound
+      - nfs-out:/ute/outbound
+      - x265-vol:/ute/x265
     networks:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 2
+      replicas: 0
       placement:
         constraints:
           - node.labels.name == station1
@@ -118,21 +120,22 @@ services:
 
   ## worker service with resource values for a different system. service name
   ## must be different from other worker service.
-  worker-other:
+  worker-laptop2:
     depends_on:
-      - "redis"
+      - redis
     image: ute:worker
     volumes:
-      - "nfs-in:/inbound"
-      - "nfs-out:/outbound"
+      - nfs-in:/ute/inbound
+      - nfs-out:/ute/outbound
+      - x265-vol:/ute/x265
     networks:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 2
       placement:
         constraints:
-          - node.labels.name == laptop
+          - node.labels.name == lenovo
       resources:
         limits:
           cpus: '1.25'
@@ -141,10 +144,16 @@ services:
 
   ## global service (one service instance per swarm host) to build x265 in a
   ## local volume, to be accessed by any local container
-  #x265-builder:
-    #image: ute:x265-builder
-    #volumes:
-      #- 
+  x265-builder:
+    image: ute:x265-builder
+    volumes:
+      - x265-vol:/ute/x265
+    networks:
+      ute_net:
+    deploy:
+      mode: global
+      restart_policy:
+        condition: none
 
 
 ## create the 'ute_net' network if it doesn't exist yet. this is a docker 
@@ -163,16 +172,19 @@ networks:
 ## volume rm <nfs volumes>" on each physical node in the swarm to remove the 
 ## old NFS mounts. otherwise new NFS settings will not take effect.
 volumes:
+  x265-vol:
+    driver: local
+
   nfs-in:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.2.4,rw,nolock,noresvport
+      o: addr=192.168.193.71,rw,nolock,noresvport
       device: ":/inbound"
  
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.2.4,rw,nolock,noresvport
+      o: addr=192.168.193.71,rw,nolock,noresvport
       device: ":/outbound"
