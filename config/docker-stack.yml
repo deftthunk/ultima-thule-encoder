@@ -1,6 +1,29 @@
 version: '3.5'
 services:
 
+  ## registry service for storing and serving built images locally to the swarm
+  #  registry:
+  #    image: registry:2
+  # ports:
+  #   - target: 443
+  #     published: 443
+  #     protocol: tcp
+  #     mode: ingress
+  # environment:
+  #   REGISTRY_HTTP_TLS_CERTIFICATE: /certs/domain.crt
+  #   REGISTRY_HTTP_TLS_KEY: /certs/domain.key
+  #   #REGISTRY_HTTP_ADDR: 0.0.0.0:443
+  # volumes:
+  #   - resources/registry/certs:/certs
+  #   - resources/registry/images:/var/lib/registry
+  # deploy:
+  #   replicas: 1
+  #   placement:
+  #     constraints: [node.role == manager]
+  # networks:
+  #   ute_net:
+
+
   ## Redis database and message broker for Celery. don't modify unless you know
   ## what you're doing
   redis:
@@ -138,8 +161,8 @@ services:
           - node.labels.name == lenovo
       resources:
         limits:
-          cpus: '1.25'
-          memory: 1000M
+          cpus: '1.75'
+          memory: 500M
 
 
   ## global service (one service instance per swarm host) to build x265 in a
@@ -179,12 +202,12 @@ volumes:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.193.71,rw,nolock,noresvport
+      o: addr=192.168.1.252,rw,nolock,noresvport
       device: ":/inbound"
  
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.193.71,rw,nolock,noresvport
+      o: addr=192.168.1.252,rw,nolock,noresvport
       device: ":/outbound"

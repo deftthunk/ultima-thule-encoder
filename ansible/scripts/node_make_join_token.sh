@@ -1,8 +1,8 @@
 #!/bin/bash
 
-mkdir -p ../../worker_staging
+mkdir -p ../../staging
 var=`docker swarm join-token worker | grep docker`
 
-echo '#!/bin/bash' > ../../worker_staging/token_cmd.sh
-echo $var >> ../../worker_staging/token_cmd.sh
-chmod +x ../../worker_staging/token_cmd.sh
+echo '#!/bin/bash' > ../../staging/token_cmd.sh
+echo $var >> ../../staging/token_cmd.sh
+chmod +x ../../staging/token_cmd.sh

@@ -7,6 +7,8 @@ app = Celery('utecode')
 app.conf.update(
         broker_url='redis://redis:6379/0',
         result_backend='redis://redis:6379/0',
+#        result_backend='cache',
+#        cache_backend='memory',
         broker_heartbeat=60,
         worker_prefetch_multiplier=1,
         task_track_started=True,

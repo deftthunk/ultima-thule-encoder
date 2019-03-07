@@ -15,8 +15,8 @@ TODO:
 workFolder = "/ute/inbound"
 outFolder = "/ute/outbound"
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-#logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+logging.basicConfig(level=logging.DEBUG)
 
 
 ## delete all pending tasks in the Broker queue
@@ -146,9 +146,17 @@ def buildCmdString(target, frameCountTotal, clientCount):
     encodeTasks = []
     fileString = ''
     frameBufferSize = 100
-    jobSize = 100
+    jobSize = 30
     jobCount = int(math.ceil(frameCountTotal / jobSize))
     counter = 0
+
+    ## handle two special cases that mess up encoding. Exit if either is true
+    if jobSize < frameBufferSize:
+        logging.error("Error: jobSize must be at least as large as frameBufferSize")
+        sys.exit()
+    if jobCount < 3:
+        logging.error("Error: jobCount must be higher. Please decrease jobSize")
+        sys.exit()
 
     ## build the output string for each chunk
     def genFileString():
@@ -164,7 +172,7 @@ def buildCmdString(target, frameCountTotal, clientCount):
 
         numLen = len(str(jobCount))
 
-        if numLen == 3:
+        if numLen <= 3:
             fileString = ''.join("{:03d}".format(counter))
         elif numLen == 4:
             fileString = ''.join("{:04d}".format(counter))
@@ -241,6 +249,8 @@ def buildCmdString(target, frameCountTotal, clientCount):
         chunkStart = frameBufferSize
         if counter == 0:
           seek = jobSize - chunkStart
+          if seek < 0:
+              seek = 0
         else:
           seek = seek + jobSize
 
