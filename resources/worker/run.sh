@@ -28,7 +28,10 @@ sleep 45
 ## one host will not be aware of each other. Find a balance between this and 
 ## the setting with the 'cpus: ' value in docker's "config/docker-stack.yml" 
 ## file for the worker image.
+
+rand=$(( ( RANDOM % 1000 ) + 1 ))
 while true; do
-  celery -A utecode worker --time-limit=3600 --loglevel=info --concurrency=1
+  celery -A utecode worker --loglevel=debug --concurrency=1 -Ofair \
+      --hostname=worker$rand@$UTE_HOSTNAME
   sleep 10
 done

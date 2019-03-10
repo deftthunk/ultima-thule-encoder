@@ -13,13 +13,16 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 @app.task(bind=True, autoretry_for=(Exception,), \
     retry_kwargs={'max_retries': 5, 'countdown': 3})
 def encode(self, cmd):
-    status = subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT, \
+    try:
+        status = subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT, \
             stdout=subprocess.PIPE)
+    except SoftTimeLimitExceeded as exc:
+        raise self.retry(exc=exc, countdown=10)
 
     logging.debug("status.stdout: " + str(status.stdout))
     fps = parseFPS(status.stdout)
-
     logging.info("Status: " + str(status.returncode))
+
     return fps
 
 

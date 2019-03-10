@@ -95,7 +95,9 @@ services:
   ## like 'docker node update --label-add name=server2 <node_name>'). see 
   ## https://docs.docker.com/engine/reference/commandline/service_update/ for
   ## details.
-  worker-laptop:
+  worker-smaug:
+    environment:
+      UTE_HOSTNAME: smaug
     depends_on:
       - redis
     image: ute:worker
@@ -107,19 +109,21 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 6
       placement:
         constraints:
-          - node.labels.name == trainer
+          - node.labels.name == smaug
       resources:
         limits:
-          cpus: '1.5'
-          memory: 500M
+          cpus: '8.0'
+          memory: 1000M
 
 
   ## worker service with resource values for a different system. service name
   ## must be different from other worker service.
-  worker-desktop:
+  worker-nuc:
+    environment:
+      UTE_HOSTNAME: nuc
     depends_on:
       - redis
     image: ute:worker
@@ -131,19 +135,21 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 1
       placement:
         constraints:
-          - node.labels.name == station1
+          - node.labels.name == nuc
       resources:
         limits:
-          cpus: '1.5'
-          memory: 500M
+          cpus: '4'
+          memory: 750M
 
 
   ## worker service with resource values for a different system. service name
   ## must be different from other worker service.
   worker-laptop2:
+    environment:
+      UTE_HOSTNAME: laptop2
     depends_on:
       - redis
     image: ute:worker
@@ -155,7 +161,7 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 2
+      replicas: 0
       placement:
         constraints:
           - node.labels.name == lenovo
@@ -202,12 +208,12 @@ volumes:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.1.252,rw,nolock,noresvport
-      device: ":/inbound"
+      o: addr=10.168.1.111,rw,nolock,noresvport
+      device: ":/mnt/user/work/ute/inbound"
  
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=192.168.1.252,rw,nolock,noresvport
-      device: ":/outbound"
+      o: addr=10.168.1.111,rw,nolock,noresvport
+      device: ":/mnt/user/work/ute/outbound"

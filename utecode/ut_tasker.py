@@ -1,7 +1,7 @@
 from .tasks import *
 from .timeout import timeout
 from celery.result import ResultSet
-import time, re, os, math
+import time, re, os, math, sys
 import subprocess
 import logging
 
@@ -75,12 +75,25 @@ def getFileName(name=None):
 ## find the number of frames in the video. this can be error prone, so multiple
 ## methods are attempted
 def getFrameCount(target):
-    frameCount = None
+    frameCount, frameRate, duration = None, None, None
 
     ## attempting mediainfo method
     mediaRet = subprocess.run(["mediainfo", "--fullscan", target], \
             stdout=subprocess.PIPE)
     mediaMatch = re.search('Frame count.*?(\d+)', mediaRet.stdout.decode('utf-8'))
+    mediaFrameRate = re.search('Frame rate.*?(\d\d\d?)(\.\d\d?\d?)?', \
+            mediaRet.stdout.decode('utf-8'))
+    mediaDuration = re.search('Duration.*?\s(\d{2,})\s*\n', \
+            mediaRet.stdout.decode('utf-8'))
+
+    ## get frame rate
+    if mediaFrameRate.group(2):
+        frameRate = mediaFrameRate.group(1) + mediaFrameRate.group(2)
+    else:
+        frameRate = mediaFrameRate.group(1)
+
+    ## get time duration
+    duration = mediaDuration.group(1)
 
     ## if we cant find a frame count, we'll do it the hard way and count frames
     ## using ffprobe. this can end up being the case if the MKV stream is
@@ -104,7 +117,11 @@ def getFrameCount(target):
         frameCount = mediaMatch.group(1)
 
     logging.info("Frame Count: " + str(frameCount))
-    return int(frameCount)
+    logging.info("Frame Rate: " + str(frameRate))
+    logging.info("Duration: " + str(duration))
+    logging.info("Calc FC: " + str(float(duration) * float(frameRate) / 1000))
+
+    return int(frameCount), float(frameRate), int(duration)
 
 
 ## use ffmpeg to detect video cropping in target sample
@@ -142,11 +159,11 @@ seek -- position marker in target file for chunks
 chunkStart / chunkEnd -- block of frames that define a 'job'
 frames -- number of total frames to encode. some will be used just prime encoder
 '''
-def buildCmdString(target, frameCountTotal, clientCount):
+def buildCmdString(target, frameCountTotal, frameRate, duration, clientCount):
     encodeTasks = []
     fileString = ''
     frameBufferSize = 100
-    jobSize = 30
+    jobSize = 2000
     jobCount = int(math.ceil(frameCountTotal / jobSize))
     counter = 0
 
@@ -172,6 +189,8 @@ def buildCmdString(target, frameCountTotal, clientCount):
 
         numLen = len(str(jobCount))
 
+        ## prepend each name with a zero-padded number for ordering. pad
+        ## the number with the amount of digit locations we need
         if numLen <= 3:
             fileString = ''.join("{:03d}".format(counter))
         elif numLen == 4:
@@ -192,7 +211,7 @@ def buildCmdString(target, frameCountTotal, clientCount):
         crop = "-filter:v \"{}\"".format(tempCrop)
 
     ## initial values for first loop iteration
-    seek, chunkStart = 0, 0
+    seek, seconds, chunkStart = 0, 0, 0
     chunkEnd = jobSize - 1
     frames = jobSize + frameBufferSize
     genFileString()
@@ -203,10 +222,11 @@ def buildCmdString(target, frameCountTotal, clientCount):
 
     ## ffmpeg and x265 CLI args, with placeholder variables defined in the 
     ## .format() method below
-    while counter < jobCount:
+    while counter <= jobCount:
         ffmpegStr = "ffmpeg \
                 -hide_banner \
                 -loglevel fatal \
+                -ss {sec} \
                 -i {tr} \
                 {cd} \
                 -strict \
@@ -214,7 +234,6 @@ def buildCmdString(target, frameCountTotal, clientCount):
                 -f yuv4mpegpipe - | x265 - \
                 --log-level error \
                 --no-open-gop \
-                --seek {sk} \
                 --frames {fr} \
                 --chunk-start {cs} \
                 --chunk-end {ce} \
@@ -222,7 +241,7 @@ def buildCmdString(target, frameCountTotal, clientCount):
                 --transfer bt709 \
                 --colormatrix bt709 \
                 --crf=20 \
-                --fps 24000/1001 \
+                --fps {frt} \
                 --min-keyint 24 \
                 --keyint 240 \
                 --sar 1:1 \
@@ -233,11 +252,12 @@ def buildCmdString(target, frameCountTotal, clientCount):
                 -o {dst}/{fStr}".format( \
                 tr = target, \
                 cd = crop, \
-                sk = seek, \
                 fr = frames, \
                 cs = chunkStart, \
                 ce = chunkEnd, \
                 ctr = counter, \
+                frt = frameRate, \
+                sec = seconds, \
                 dst = outFolder, \
                 fStr = fileString)
 
@@ -248,11 +268,13 @@ def buildCmdString(target, frameCountTotal, clientCount):
 
         chunkStart = frameBufferSize
         if counter == 0:
-          seek = jobSize - chunkStart
-          if seek < 0:
-              seek = 0
+            seek = jobSize - chunkStart
+            if seek < 0:
+                seek = 0
+            seconds = fileSeek(seek, frameRate)
         else:
-          seek = seek + jobSize
+            seek = seek + jobSize
+            seconds = fileSeek(seek, frameRate)
 
         ## if we're about to encode past EOF, set chunkEnd to finish on the 
         ## last frame, and adjust 'frames' accordingly. else, continue
@@ -262,19 +284,28 @@ def buildCmdString(target, frameCountTotal, clientCount):
         ## be larger, but prevents any potential buggy behaviour with having a
         ## single frame end task. this calculation includes before/after buffer
         if (seek + (frameBufferSize * 2) + jobSize) > frameCountTotal:
-          chunkEnd = frameCountTotal - seek
-          frames = chunkEnd
-          ## artifically decrement jobCount, since we're subsuming the last task
-          jobCount -= 1
+            chunkEnd = frameCountTotal - seek
+            frames = chunkEnd
+            ## artifically decrement jobCount, since we're subsuming the last task
+            jobCount -= 1
         else:
-          chunkEnd = chunkStart + jobSize - 1
-          frames = jobSize + (frameBufferSize * 2)
+            chunkEnd = chunkStart + jobSize - 1
+            frames = jobSize + (frameBufferSize * 2)
 
         counter += 1
         genFileString()
 
     logging.info("Encode Tasks: " + str(len(encodeTasks)))
     return encodeTasks
+
+
+'''
+calculate the position in the video (timewise) based on the frame we're
+looking for and how many frames per second it runs at
+'''
+def fileSeek(pos, fps):
+    newPos = round(pos / fps, 2)
+    return newPos
 
 
 '''
@@ -286,7 +317,7 @@ the ffmpeg task.
 'encode.delay()' returns a handle to that task with methods for determing the 
 state of the task. Handles are stored in 'statusHandles' list for later use.
 '''
-@timeout(300)
+@timeout(120)
 def populateQueue(encodeTasks):
     r = ResultSet([])
     taskHandles = {}
@@ -305,7 +336,7 @@ def populateQueue(encodeTasks):
 
 
 def testCallback(taskId, result):
-    logging.info("TaskID: " + taskId)
+    #logging.info("TaskID: " + taskId)
     logging.info("Result: " + str(result))
     
 
@@ -313,15 +344,32 @@ def rebuildVideo(target):
     dirList = os.listdir(outFolder)
     dirFiles = [x for x in dirList if x[-4:] == '.265']
     dirFiles.sort()
-    outFilePath = '/'.join([outFolder, getFileName(target)])
-    cmd = ['mkvmerge', '--output', outFilePath, '[']
+    tempFileName = '_'.join(['noaudio', getFileName(target)])
+    outFilePath = '/'.join([outFolder, tempFileName])
+    cmd = ['mkvmerge', '--output', outFilePath]
     
+    firstFlag = 0
     for chunk in dirFiles:
         path = '/'.join([outFolder, chunk])
-        cmd.append(path)
+        if firstFlag == 1:
+            cmd.append('+')
 
-    cmd.append(']')
+        cmd.append(path)
+        firstFlag = 1
+
     cmdString = ' '.join(cmd)
+    logging.info("rebuildVideo() cmd: " + cmdString)
+    os.system(cmdString)
+
+    return outFilePath
+
+
+def mergeAudio(origFile, newFile):
+    finalFileName = '/'.join([outFolder, getFileName(origFile)])
+    cmd = ['mkvmerge', '--output', finalFileName, '-D', origFile, newFile]
+
+    cmdString = ' '.join(cmd)
+    logging.info("mergeAudio() cmd: " + cmdString)
     os.system(cmdString)
 
 
@@ -329,6 +377,8 @@ def cleanOutFolder(target):
     dirFiles = os.listdir(outFolder)
     for entry in dirFiles:
         if entry[-4:] == '.265':
+            os.remove(''.join([outFolder, '/', entry]))
+        if entry[0:7] == 'noaudio':
             os.remove(''.join([outFolder, '/', entry]))
 
 
@@ -355,20 +405,27 @@ def main():
                 sleep(10)
                 break
 
-            frameCountTotal = getFrameCount(targetFile)
-            encodeTasks = buildCmdString(targetFile, frameCountTotal, clientCount)
+            frameCountTotal, frameRate, duration = getFrameCount(targetFile)
+            encodeTasks = buildCmdString(targetFile, frameCountTotal, \
+                    frameRate, duration, clientCount)
+
             taskHandles, retSet = populateQueue(encodeTasks)
 
             logging.info("Waiting on tasks...")
             retSet.join(callback=testCallback)
 
             logging.info("Building new Matroska file")
-            rebuildVideo(targetFile)
+            newFile = rebuildVideo(targetFile)
+
+            logging.info("Merging audio tracks into new MKV file")
+            mergeAudio(targetFile, newFile)
 
             logging.info("Clearing out '.265' chunk files")
             cleanOutFolder(targetFile)
- 
-        logging.info("\nFinished " + targetFile)
+
+            logging.info("\nFinished " + targetFile)
+
+        
         sleep(10)
         break
 
