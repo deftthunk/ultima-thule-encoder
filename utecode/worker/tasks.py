@@ -33,11 +33,3 @@ def parseFPS(string):
     else:
         return 00
     
-
-def test(x, y):
-    return x * y
-
-
-def testSleep(x, y):
-    sleep(x)
-    return x + y
