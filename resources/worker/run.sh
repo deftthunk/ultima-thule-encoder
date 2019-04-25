@@ -1,7 +1,6 @@
 #!/bin/bash
 
-## give docker-compose time to spin up rabbitmq before celery 
-## tries to connect
+## give docker-stack time to spin up services before connecting
 echo "Waiting for Broker to start up."
 echo "Sleeping 45 seconds"
 sleep 45
@@ -14,24 +13,21 @@ sleep 45
 ## here will not be reflected in execution until a new Docker worker image
 ## is created and deployed.
 ##
-## '--time-limit' is how long a worker will
-## allow a task to run before considering it a 'stuck' process and killing 
-## the task. set to longer duration or remove if you plan on tasking very
-## large chunks of work
-##
-## '--concurrency' determines how many celery workers to spawn for a given
-## host. if removed, Celery will default to one worker per logical
-## CPU core. 
-##
 ## Since UTE runs in docker swarm nodes, a setting of '1' will 
 ## result in one Celery worker per Docker Swarm node. Multiple swarm nodes on
 ## one host will not be aware of each other. Find a balance between this and 
 ## the setting with the 'cpus: ' value in docker's "config/docker-stack.yml" 
 ## file for the worker image.
 
-rand=$(( ( RANDOM % 1000 ) + 1 ))
+export LC_ALL=C.UTF-8
+export LANG=C.UTF-8
+
+rand=$(( ( RANDOM % 10000 ) + 1 ))
 while true; do
-  celery -A utecode worker --loglevel=debug --concurrency=1 -Ofair \
-      --hostname=worker$rand@$UTE_HOSTNAME
+  cd /home/utbot/utecode
+  rqworker -u "redis://redis" --name "$rand@$UTE_HOSTNAME" \
+    --path '/home/utbot/utecode' high default low
+  
+  echo "Worker restarting?!?!?!"
   sleep 10
 done

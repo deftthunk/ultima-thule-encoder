@@ -1,31 +1,35 @@
-from .tasks import *
-from .timeout import timeout
-from celery.result import ResultSet
-import time, re, os, math, sys
+import re, os, math, sys
 import subprocess
 import logging
+from time import sleep
+from redis import Redis
+from rq import Queue, Worker
 
 
-'''
-TODO: 
-- have variables defined by users in a config file, not here.
-- add asyncio functionality for monitoring when celery worker count changes
-- provide Celery worker direct and broadcast control for monitoring
-'''
 workFolder = "/ute/inbound"
 outFolder = "/ute/outbound"
 
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 logging.basicConfig(level=logging.DEBUG)
 
-
 ## delete all pending tasks in the Broker queue
-@timeout(60)
-def purgeTasks():
-    numDeleted = app.control.purge()
+def purgeQueue(q):
+    #numDeleted = app.control.purge()
+    q.empty()
 
-    logging.info("Tasks purged: " + str(numDeleted))
-    return numDeleted
+    #logging.info("Queued tasks purged: " + str(numDeleted))
+    logging.info("Queued jobs purged")
+    
+    #return numDeleted
+
+
+## kill all active tasks
+def purgeActive(q):
+    for job in q.jobs:
+        if job.get_status() == 'started':
+            job.cancel
+
+    logging.info("All tasks purged")
 
 
 ## grab first file found in the NFS 'inbound' folder
@@ -38,21 +42,16 @@ def findWork():
     return listOfFiles
 
 
-## ping Celery clients using the broker container to get a count of 
+## find clients using the broker container to get a count of 
 ## available workers in the swarm
-def getClientCount():
-    pingRet = None
+def getClientCount(redisLink):
+    workers = Worker.all(connection=redisLink)
+    logging.info("Found " + str(len(workers)) + " workers")
 
-    while True:
-        try:
-            pingRet = app.control.ping(timeout=3.0)
-        except:
-            sleep(1)
-            continue
-        break
+    for worker in workers:
+        logging.info(str(worker.name))
 
-    logging.info("Celery Clients: " + str(len(pingRet)))
-    return len(pingRet)
+    return len(workers)
 
 
 ## return the base name of a filepath. if no arg given, return the name of
@@ -163,11 +162,7 @@ def buildCmdString(target, frameCountTotal, frameRate, duration, clientCount):
     encodeTasks = []
     fileString = ''
     frameBufferSize = 100
-<<<<<<< HEAD
-    jobSize = 2000
-=======
-    jobSize = 1000
->>>>>>> c9a136d7155ab1f6193f0ff9c821bb92a1db7896
+    jobSize = 100
     jobCount = int(math.ceil(frameCountTotal / jobSize))
     counter = 0
 
@@ -184,6 +179,12 @@ def buildCmdString(target, frameCountTotal, frameRate, duration, clientCount):
         nonlocal fileString
         namePart = ''
         fileName = getFileName(target)
+        newFolder = 'ute_' + fileName
+        print("Newfolder " + newFolder)
+        newPath = '/'.join([outFolder, newFolder])
+        print("newPath: " + newPath)
+        os.makedirs(newPath, 0o755, exist_ok=True)
+        #logging.info("Outbound path: " + str(newPath))
 
         ## use part (or all) of the filename to help name chunks
         if len(fileName) > 10:
@@ -195,18 +196,21 @@ def buildCmdString(target, frameCountTotal, frameRate, duration, clientCount):
 
         ## prepend each name with a zero-padded number for ordering. pad
         ## the number with the amount of digit locations we need
+        fileString = newFolder + '/'
         if numLen <= 3:
-            fileString = ''.join("{:03d}".format(counter))
+            fileString += ''.join("{:03d}".format(counter))
         elif numLen == 4:
-            fileString = ''.join("{:04d}".format(counter))
+            fileString += ''.join("{:04d}".format(counter))
         elif numLen == 5:
-            fileString = ''.join("{:05d}".format(counter))
+            fileString += ''.join("{:05d}".format(counter))
         elif numLen == 6:
-            fileString = ''.join("{:06d}".format(counter))
+            fileString += ''.join("{:06d}".format(counter))
         else:
-            fileString = ''.join("{:07d}".format(counter))
+            fileString += ''.join("{:07d}".format(counter))
 
         fileString += "_" + namePart + ".265"
+        logging.debug("FileString: " + str(fileString))
+
 
     ## determine if cropping will be included
     crop = detectCropping(target)
@@ -268,7 +272,7 @@ def buildCmdString(target, frameCountTotal, frameRate, duration, clientCount):
         ## push built CLI command onto end of list
         encodeTasks.append(ffmpegStr)
         ## if debugging, cut out excess spaces from command string
-        logging.info(' '.join(ffmpegStr.split()))
+        logging.debug(' '.join(ffmpegStr.split()))
 
         chunkStart = frameBufferSize
         if counter == 0:
@@ -280,13 +284,15 @@ def buildCmdString(target, frameCountTotal, frameRate, duration, clientCount):
             seek = seek + jobSize
             seconds = fileSeek(seek, frameRate)
 
-        ## if we're about to encode past EOF, set chunkEnd to finish on the 
-        ## last frame, and adjust 'frames' accordingly. else, continue
-        ##
-        ## if this next chunk is going to be the penultimate chunk, grow the
-        ## job to subsume what would be the last truncated task. this task will
-        ## be larger, but prevents any potential buggy behaviour with having a
-        ## single frame end task. this calculation includes before/after buffer
+        '''
+        if we're about to encode past EOF, set chunkEnd to finish on the 
+        last frame, and adjust 'frames' accordingly. else, continue
+
+        if this next chunk is going to be the penultimate chunk, grow the
+        job to subsume what would be the last truncated task. this task will
+        be larger, but prevents any potential buggy behaviour with having a
+        single frame end task. this calculation includes before/after buffer
+        '''
         if (seek + (frameBufferSize * 2) + jobSize) > frameCountTotal:
             chunkEnd = frameCountTotal - seek
             frames = chunkEnd
@@ -300,7 +306,7 @@ def buildCmdString(target, frameCountTotal, frameRate, duration, clientCount):
         genFileString()
 
     logging.info("Encode Tasks: " + str(len(encodeTasks)))
-    return encodeTasks
+    return encodeTasks, fileString
 
 
 '''
@@ -321,227 +327,180 @@ the ffmpeg task.
 'encode.delay()' returns a handle to that task with methods for determing the 
 state of the task. Handles are stored in 'statusHandles' list for later use.
 '''
-@timeout(120)
-def populateQueue(encodeTasks):
-    r = ResultSet([])
-    taskHandles = {}
+def populateQueue(q, encodeTasks):
+    jobHandles = {}
 
     for task in encodeTasks:
         try:
-            ret = encode.delay(task)
-            r.add(ret)
-            logging.debug("Task ID: " + str(ret.task_id))
-            taskHandles[ret.task_id] = ret
+            job = q.enqueue('tasks.encode', task, job_timeout=3600)
+            logging.debug("Job ID: " + str(job.get_id()))
+            jobHandles[job.get_id()] = job
         except:
-            logging.info("populateQueue fail: " + str(task.traceback))
+            logging.info("populateQueue fail: " + str(task.exc_info))
  
-    logging.info("Tasks queued: " + str(len(taskHandles)))
-    return taskHandles, r
-
-
-def testCallback(taskId, result):
-    #logging.info("TaskID: " + taskId)
-    logging.info("Result: " + str(result))
+    logging.info("Jobs queued: " + str(len(jobHandles)))
     
+    return q, jobHandles
 
-def rebuildVideo(target):
-    dirList = os.listdir(outFolder)
+
+def testOnMessage(msg):
+    if msg['status'] == "FINISHED":
+        result = msg['result']
+        logging.info(str(result['hostname']) + ': ' + str(result['fps']))
+
+
+'''
+wait for every task in 'resultSet' to return. on return, the task is directed 
+to a callback function for handling the result, which in this case is x265's
+average frames per second speed over the finished chunk of work.
+
+if a task is 'revoked' (either by code or user via Flower GUI), handle that 
+exception and assume the task was stuck and needs to be requeued. find the 
+original task, resubmit it, add it to the resultSet object, and return to 
+waiting for all tasks to finish
+'''
+def waitForTaskCompletion(q, jobDict):
+    failRegistry = q.failed_job_registry
+    completedJobs = []
+
+    while True:
+        for jobId, job in jobDict.items():
+            if job.get_status() == 'finished':
+                logging.info("ID: " + str(jobId))
+                logging.info("FPS: " + str(job.result))
+                completedJobs.append(jobId)
+            if job.is_failed == True:
+                failRegistry.requeue(job)
+                logging.info("Requeued failed job " + jobId)
+
+
+            sleep(0.2)
+        sleep(3)
+
+        ## remove any completed jobs from jobDict
+        for item in completedJobs:
+            del jobDict[item]
+
+        ## clear completedJobs list
+        del completedJobs[:]
+
+        if len(jobDict) == 0:
+            break
+
+
+def rebuildVideo(target, fullOutboundPath):
+    dirList = os.listdir(fullOutboundPath)
     dirFiles = [x for x in dirList if x[-4:] == '.265']
     dirFiles.sort()
     tempFileName = '_'.join(['noaudio', getFileName(target)])
-    outFilePath = '/'.join([outFolder, tempFileName])
-    cmd = ['mkvmerge', '--output', outFilePath]
+    noAudioFilePath = '/'.join([fullOutboundPath, tempFileName])
+    cmd = ['mkvmerge', '--output', noAudioFilePath]
     
     firstFlag = 0
     for chunk in dirFiles:
-        path = '/'.join([outFolder, chunk])
+        path = '/'.join([fullOutboundPath, chunk])
         if firstFlag == 1:
             cmd.append('+')
 
         cmd.append(path)
         firstFlag = 1
-<<<<<<< HEAD
 
     cmdString = ' '.join(cmd)
     logging.info("rebuildVideo() cmd: " + cmdString)
     os.system(cmdString)
 
-    return outFilePath
+    return noAudioFilePath
 
 
-def mergeAudio(origFile, newFile):
-    finalFileName = '/'.join([outFolder, getFileName(origFile)])
-    cmd = ['mkvmerge', '--output', finalFileName, '-D', origFile, newFile]
-
-    cmdString = ' '.join(cmd)
-=======
+def mergeAudio(origFile, noAudioFile, fullOutboundPath):
+    finalFileName = '/'.join([fullOutboundPath, getFileName(origFile)])
+    cmd = ['mkvmerge', '--output', finalFileName, '-D', origFile, noAudioFile]
 
     cmdString = ' '.join(cmd)
-    logging.info("rebuildVideo() cmd: " + cmdString)
-    os.system(cmdString)
-
-    return outFilePath
-
-
-def mergeAudio(origFile, newFile):
-    finalFileName = '/'.join([outFolder, getFileName(origFile)])
-    cmd = ['mkvmerge', '--output', finalFileName, '-D', origFile, newFile]
-
-    cmdString = ' '.join(cmd)
->>>>>>> c9a136d7155ab1f6193f0ff9c821bb92a1db7896
     logging.info("mergeAudio() cmd: " + cmdString)
     os.system(cmdString)
 
 
-def cleanOutFolder(target):
-    dirFiles = os.listdir(outFolder)
+def cleanOutFolder(fullOutboundPath):
+    dirFiles = os.listdir(fullOutboundPath)
     for entry in dirFiles:
         if entry[-4:] == '.265':
-            os.remove(''.join([outFolder, '/', entry]))
+            os.remove(''.join([fullOutboundPath, '/', entry]))
         if entry[0:7] == 'noaudio':
-            os.remove(''.join([outFolder, '/', entry]))
+            os.remove(''.join([fullOutboundPath, '/', entry]))
 
 
-def main():
+def main():    
+    redisLink = Redis('redis')
+    q = Queue(connection=redisLink)
+
+    completedFiles = []
+
     while True:
+        checkFlag = 0
         files = findWork()
 
         ## check for files and clients
         if len(files) == 0:
             logging.debug("No files, sleeping")
-            sleep(10)
+            sleep(30)
             continue
-        if getClientCount() == 0:
-            logging.debug("No clients, sleeping")
-            sleep(10)
+
+        ## check if we've already worked these files
+        for newFile in files:
+            for oldFile in completedFiles:
+                if newFile == oldFile:
+                    checkFlag = 1
+        if checkFlag == 1:
+            logging.info("No new files, sleeping")
+            sleep(30)
+            continue
+
+        ## are there workers available
+        if getClientCount(redisLink) == 0:
+            logging.debug("No workers, sleeping")
+            sleep(30)
             continue
 
         ## work through files found
         for targetFile in files:
             ## check if client list has changed
-            clientCount = getClientCount()
+            clientCount = getClientCount(redisLink)
             if clientCount == 0:
-                logging.debug("No clients, sleeping")
-                sleep(10)
+                logging.debug("No workers, sleeping")
+                sleep(30)
                 break
 
             frameCountTotal, frameRate, duration = getFrameCount(targetFile)
-            encodeTasks = buildCmdString(targetFile, frameCountTotal, \
-                    frameRate, duration, clientCount)
+            encodeTasks, outboundFile = buildCmdString(targetFile, \
+                    frameCountTotal, frameRate, duration, clientCount)
 
-            taskHandles, retSet = populateQueue(encodeTasks)
+            ## determine full path of folder for video chunks
+            tempPath = outboundFile.split('/')
+            tempLen = len(tempPath)
+            tempPath2 = '/'.join(tempPath[:tempLen-1])
+            fullOutboundPath = '/'.join([outFolder, tempPath2])
+            logging.info("Outbound path: " + str(fullOutboundPath))
 
-            logging.info("Waiting on tasks...")
-            retSet.join(callback=testCallback)
+            q, jobHandles = populateQueue(q, encodeTasks)
+
+            logging.info("Waiting on jobs...")
+            waitForTaskCompletion(q, jobHandles)
 
             logging.info("Building new Matroska file")
-            newFile = rebuildVideo(targetFile)
+            noAudioFile = rebuildVideo(targetFile, fullOutboundPath)
 
             logging.info("Merging audio tracks into new MKV file")
-            mergeAudio(targetFile, newFile)
+            mergeAudio(targetFile, noAudioFile, fullOutboundPath)
 
             logging.info("Clearing out '.265' chunk files")
-            cleanOutFolder(targetFile)
+            cleanOutFolder(fullOutboundPath)
 
-<<<<<<< HEAD
             logging.info("\nFinished " + targetFile)
-
+            completedFiles.append(targetFile)
         
-=======
-            # debugging break
-            break
- 
-        logging.info("\nFinished " + targetFile)
->>>>>>> c9a136d7155ab1f6193f0ff9c821bb92a1db7896
-        sleep(10)
-        break
 
 
-
-#if __name__ == "__main__":
-#    main()
-
-
-
-'''
-Once the queue in RabbitMQ is populated with encoding tasks, use Celery 
-to watch for when tasks are passed to a worker and become 'active'. Once 
-active, we can get that list of active tasks and periodically poll their
-status for results.
-
-When a task is finished, we check the result, and if sucessful, discard 
-it and refresh our active task list. If unsucessful, attempt to resubmit 
-the task to the queue.
-
-
-def waitForTaskCompletion(taskHandles):
-    ## find all celery worker id's
-    workerIds = None
-    while True:
-        try:
-            workerTaskingDict = app.control.inspect().active()
-            if len(workerTaskingDict) < 1:
-                continue
-        except:
-            sleep(1)
-            continue
-        break
-
-
-    while dict 'taskHandles' has items, loop over every Celery worker and every
-    task/thread each worker has (by default 1 per worker). grab the task ID of
-    the current task that worker has, and find it in 'taskHandles' dict. Use
-    the dict value to check the status of the task with the object's ".ready()"
-    method. When true, delete task entry from dict.
-    
-    layout of workerTaskingDict:
-    {
-        'celery@caff7e415107': [], 
-        'celery@87eaf40ea151': [
-        {
-            'id': 'bb82ac8d-f32e-44f6-8051-e7d949ab9679', 
-            'name': 'utecode.tasks.encode', 
-            'args': "
-            (
-                'sleep 30',
-            )", 
-            'kwargs': '{}', 
-            'type': 'utecode.tasks.encode', 
-            'hostname': 'celery@87eaf40ea151', 
-            'time_start': 1549599207.44921, 
-            'acknowledged': True, 
-            'delivery_info': 
-            {
-                'exchange': '', 
-                'routing_key': 'celery', 
-                'priority': 0, 
-                'redelivered': None
-            }, 
-            'worker_pid': 11
-        }]
-    }
-    
-    taskList = []
-    while len(taskHandles) > 0:
-        workerTaskingDict = app.control.inspect().active()
-        for worker in workerTaskingDict.keys():
-            logging.debug("Worker: " + worker)
-            ## wait on tasks
-            for taskItem in workerTaskingDict[worker]:
-                taskList.append(taskItem['id'])
-        
-        flag = True
-        while flag:
-            for task in taskList:
-                if taskHandles[task].ready():
-                    logging.info("Result: " + str(taskHandles[task].result))
-                    del taskHandles[task]
-                    taskList.remove(task)
-                    flag = False
-                    logging.info("Completed task " + task)
-                    break
-
-                sleep(2)
-''' 
-
+if __name__ == "__main__":
+    main()
 

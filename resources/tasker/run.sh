@@ -14,6 +14,7 @@ sleep 60
 
 while true; do
   python3 -m utecode.ut_tasker
+  echo "Tasker died!? Sleeping for 60 seconds and respawning"
   sleep 60
 done
 

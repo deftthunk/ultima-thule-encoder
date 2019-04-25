@@ -1,4 +1,3 @@
-#FROM python:3.6-slim-stretch
 FROM debian:stretch-slim
 
 ## install python3, add user 'utbot', and update shared lib path
@@ -20,11 +19,12 @@ RUN apt-get update && \
 ## become user 'utbot', change working dir, install Celery
 USER utbot
 WORKDIR /home/utbot
-RUN pip3 install celery --user
-RUN pip3 install "celery[redis]" --user
+#RUN pip3 install celery --user
+#RUN pip3 install "celery[redis]" --user
 RUN pip3 install redis --user
+RUN pip3 install rq --user
 
-COPY ./utecode /home/utbot/utecode
+COPY ./utecode/tasker /home/utbot/utecode
 ENV PATH="/home/utbot/.local/bin:${PATH}"
 #CMD [ "python3", "-m", "utecode.ut_tasker" ]
 

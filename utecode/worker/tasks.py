@@ -1,4 +1,3 @@
-from utecode.celery import app
 from time import sleep
 import re
 import logging
@@ -6,18 +5,12 @@ import subprocess
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 
-
 ## take a CLI command from the task and execute it via subprocess module
 ## the decorator '@app.task' enables retrying for failed tasks which
 ## will be seen in Flower
-@app.task(bind=True, autoretry_for=(Exception,), \
-    retry_kwargs={'max_retries': 5, 'countdown': 3})
-def encode(self, cmd):
-    try:
-        status = subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT, \
-            stdout=subprocess.PIPE)
-    except SoftTimeLimitExceeded as exc:
-        raise self.retry(exc=exc, countdown=10)
+def encode(cmd):
+    status = subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT, \
+        stdout=subprocess.PIPE)
 
     logging.debug("status.stdout: " + str(status.stdout))
     fps = parseFPS(status.stdout)
@@ -39,3 +32,12 @@ def parseFPS(string):
         return fps[-1]
     else:
         return 00
+    
+
+def test(x, y):
+    return x * y
+
+
+def testSleep(x, y):
+    sleep(x)
+    return x + y

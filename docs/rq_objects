@@ -1,0 +1,76 @@
+# Getting the number of jobs in the queue
+print(len(q))
+
+# Retrieving jobs
+queued_job_ids = q.job_ids # Gets a list of job IDs from the queue
+queued_jobs = q.jobs # Gets a list of enqueued job instances
+job = q.fetch_job('my_id') # Returns job having ID "my_id"
+
+# Emptying a queue, this will delete all jobs in this queue
+q.empty()
+
+# Deleting a queue
+q.delete(delete_jobs=True) # Passing in `True` will remove all jobs in the queue
+# queue is now unusable. It can be recreated by enqueueing jobs to it.
+
+
+## Get number of workers
+from redis import Redis
+from rq import Queue, Worker
+
+# Returns all workers registered in this connection
+redis = Redis()
+workers = Worker.all(connection=redis)
+
+# Returns all workers in this queue (new in version 0.10.0)
+queue = Queue('queue_name')
+workers = Worker.all(queue=queue)
+worker = workers[0]
+print(worker.name)
+
+================================================================================
+
+>>> dir(ret2)
+['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_args', '_data', '_dependency_id', '_execute', '_func_name', '_id', '_instance', '_kwargs', '_result', '_status', '_unpickle_data', 'args', 'cancel', 'cleanup', 'connection', 'create', 'created_at', 'data', 'delete', 'delete_dependents', 'dependency', 'dependent_ids', 'dependents_key', 'dependents_key_for', 'description', 'ended_at', 'enqueued_at', 'exc_info', 'exists', 'failed_job_registry', 'failure_ttl', 'fetch', 'func', 'func_name', 'get_call_string', 'get_id', 'get_result_ttl', 'get_status', 'get_ttl', 'id', 'instance', 'is_deferred', 'is_failed', 'is_finished', 'is_queued', 'is_started', 'key', 'key_for', 'kwargs', 'meta', 'origin', 'perform', 'redis_job_namespace_prefix', 'refresh', 'register_dependency', 'requeue', 'result', 'result_ttl', 'return_value', 'save', 'save_meta', 'set_id', 'set_status', 'started_at', 'timeout', 'to_dict', 'ttl']
+
+
+
+>>> q = Queue(connection=Redis('redis'))
+>>> ret1 = q.enqueue('tasks.test', 3, 4)
+>>> ret1
+Job('254bb759-d93f-4b73-bcfe-5845048affe6', enqueued_at=datetime.datetime(2019, 4, 23, 3, 14, 1, 152659))
+>>> ret1.result
+12
+
+
+
+>>> ret2.args  
+(8, 4)
+
+
+>>> ret2.enqueued_at
+datetime.datetime(2019, 4, 23, 3, 14, 59, 536882)
+
+
+>>> ret2.get_id()
+'8ba4ea4b-ac69-4d59-9100-bd57b8d39870'
+>>> ret2.get_status()
+'finished'
+>>> ret2 = q.enqueue('tasks.testSleep', 30, 4)
+>>> ret2.get_status()
+'started'
+
+
+>>> ret2.key
+b'rq:job:36208dfb-71e5-4633-89bf-32a8a198f4da'
+
+
+>>> ret2.meta 
+{}
+>>> ret2.origin
+'default'
+
+
+>>> ret2.return_value
+34
+

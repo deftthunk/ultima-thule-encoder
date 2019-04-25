@@ -109,7 +109,7 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 6
+      replicas: 0
       placement:
         constraints:
           - node.labels.name == smaug
@@ -135,7 +135,7 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 1
+      replicas: 0
       placement:
         constraints:
           - node.labels.name == nuc
@@ -147,9 +147,9 @@ services:
 
   ## worker service with resource values for a different system. service name
   ## must be different from other worker service.
-  worker-laptop2:
+  worker-lenovo:
     environment:
-      UTE_HOSTNAME: laptop2
+      UTE_HOSTNAME: lenovo
     depends_on:
       - redis
     image: ute:worker
@@ -161,14 +161,14 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 2
       placement:
         constraints:
           - node.labels.name == lenovo
       resources:
         limits:
-          cpus: '1.75'
-          memory: 500M
+          cpus: '1.5'
+          memory: 750M
 
 
   ## global service (one service instance per swarm host) to build x265 in a
@@ -208,12 +208,16 @@ volumes:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=10.168.1.111,rw,nolock,noresvport
-      device: ":/mnt/user/work/ute/inbound"
+      o: addr=10.0.1.158,rw,nolock,noresvport
+      device: ":/inbound"
+      #o: addr=10.168.1.111,rw,nolock,noresvport
+      #device: ":/mnt/user/work/ute/inbound"
  
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=10.168.1.111,rw,nolock,noresvport
-      device: ":/mnt/user/work/ute/outbound"
+      o: addr=10.0.1.158,rw,nolock,noresvport
+      device: ":/outbound"
+      #o: addr=10.168.1.111,rw,nolock,noresvport
+      #device: ":/mnt/user/work/ute/outbound"

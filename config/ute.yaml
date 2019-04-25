@@ -1,0 +1,27 @@
+## test user config
+##
+## General Settings
+task size: 300
+buffer size: 100
+
+## FFmpeg settings
+## command args will be run in order, so make sure there's no conficts
+## if you add/remove arguments
+#ffmpeg:
+#  hide_banner: 
+#  loglevel: fatal
+#  ss: ute_reserved
+#  i: ute_reserved
+# crop:
+
+
+
+## Error handling
+timeout: 20
+
+
+## NFS Share Settings
+server address: 10.168.1.111
+inbound path: /mnt/user/work/ute/inbound
+outbound path: /mnt/user/work/ute/outbound
+
