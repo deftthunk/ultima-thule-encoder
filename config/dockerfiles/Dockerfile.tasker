@@ -19,14 +19,11 @@ RUN apt-get update && \
 ## become user 'utbot', change working dir, install Celery
 USER utbot
 WORKDIR /home/utbot
-#RUN pip3 install celery --user
-#RUN pip3 install "celery[redis]" --user
 RUN pip3 install redis --user
 RUN pip3 install rq --user
 
 COPY ./utecode/tasker /home/utbot/utecode
 ENV PATH="/home/utbot/.local/bin:${PATH}"
-#CMD [ "python3", "-m", "utecode.ut_tasker" ]
 
 ## test block
 COPY ./resources/tasker/run.sh /home/utbot/run.sh

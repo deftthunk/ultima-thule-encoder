@@ -24,14 +24,11 @@ VOLUME [ "/ute/x265" ]
 ## become user 'utbot', change working dir, install Celery
 USER utbot
 WORKDIR /home/utbot
-#RUN pip3 install "celery[redis]" --user
-#RUN pip3 install redis --user
 RUN pip3 install rq --user
 
 ## add main script loop, UTE python celery code, and
 ## set celery execution path
 COPY ./resources/worker/run.sh /home/utbot/run.sh
-COPY ./resources/worker/run_root.sh /root/run_root.sh
 COPY ./resources/worker/run_root.sh /run_root.sh
 COPY ./utecode/worker /home/utbot/utecode
 ENV PATH="/home/utbot/.local/bin:${PATH}"

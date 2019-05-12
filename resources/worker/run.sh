@@ -2,8 +2,8 @@
 
 ## give docker-stack time to spin up services before connecting
 echo "Waiting for Broker to start up."
-echo "Sleeping 45 seconds"
-sleep 45
+echo "Sleeping 10 seconds"
+sleep 10
 
 ## runs Celery python code as a worker, which will reach out and connect to
 ## the configured broker (Redis) service. the 'utecode' referenced below is a copy
@@ -26,7 +26,7 @@ rand=$(( ( RANDOM % 10000 ) + 1 ))
 while true; do
   cd /home/utbot/utecode
   rqworker -u "redis://redis" --name "$rand@$UTE_HOSTNAME" \
-    --path '/home/utbot/utecode' high default low
+    --path '/home/utbot/utecode' high medium low
   
   echo "Worker restarting?!?!?!"
   sleep 10

@@ -10,11 +10,20 @@
 ## and placed in "/home/utbot/" and executed. Changes here will not be 
 ## reflected in execution until a new Docker tasker image is created and 
 ## deployed.
-sleep 60
+sleep 30
 
+watchdog=0
 while true; do
-  python3 -m utecode.ut_tasker
-  echo "Tasker died!? Sleeping for 60 seconds and respawning"
-  sleep 60
+#  python3 -m utecode.tasker
+
+  ## if watchdog is true, we've been here before and probably caught in a loop
+#  if [[ $watchdog -eq 1 ]]; then
+#    echo "Tasker died again! Staying dead..."
+#    exit
+#  else
+#    echo "Tasker died!? Sleeping for 60 seconds and respawning"
+#    watchdog=1
+    sleep 60
+#  fi
 done
 

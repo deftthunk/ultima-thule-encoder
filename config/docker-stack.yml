@@ -41,28 +41,23 @@ services:
       ute_net:
 
 
-  ## defines the flower container for monitoring RabbitMQ flower will wait for 
-  ## rabbitmq to start first, and then attempt connection.
-  ##
-  ## by default, this runs on the swarm manager machine, but doesn't need to.
-  ## just has to punch a hole in the network to be reachable by web browser
-  flower:
-    depends_on:
-      - redis
-    image: mher/flower:latest
-    command: "--broker=redis://redis:6379/0
-              --broker-api=http://redis:6379/0"
-    deploy:
-      replicas: 1
-      placement:
-        constraints: [node.role == manager]
-    ports:
-      - target: 5555
-        published: 5555
-        protocol: tcp
-        mode: host
-    networks:
-      ute_net:
+  ## docker stats web UI
+  #  redis-stats:
+  #  depends_on:
+  #    - redis
+  #  image: insready/redis-stat:latest
+  #  ports:
+  #    - target: 63790
+  #      published: 8080
+  #      protocol: tcp
+  #      mode: ingress
+  #  deploy:
+  #    replicas: 1
+  #    placement:
+  #      constraints: [node.role == manager]
+  #  networks:
+  #    ute_net:
+
 
 
   ## tasker drives the worker tasking by building jobs from files and 
@@ -73,15 +68,14 @@ services:
       - redis
     image: ute:tasker
     volumes:
-      - nfs-in:/ute/inbound
-      - nfs-out:/ute/outbound
+      - nfs-in:/ute/inbox
+      - nfs-out:/ute/outbox
     networks:
       ute_net:
     deploy:
       replicas: 1
       placement:
         constraints: [node.role == manager]
- 
 
   ## defines a task to run the celery worker container in. these tasks are 
   ## replicated through the docker swarm nodes the 'cpus' key reflects how 
@@ -102,21 +96,21 @@ services:
       - redis
     image: ute:worker
     volumes:
-      - nfs-in:/ute/inbound
-      - nfs-out:/ute/outbound
+      - nfs-in:/ute/inbox
+      - nfs-out:/ute/outbox
       - x265-vol:/ute/x265
     networks:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 6
       placement:
         constraints:
           - node.labels.name == smaug
       resources:
         limits:
           cpus: '8.0'
-          memory: 1000M
+          memory: 2000M
 
 
   ## worker service with resource values for a different system. service name
@@ -128,34 +122,35 @@ services:
       - redis
     image: ute:worker
     volumes:
-      - nfs-in:/ute/inbound
-      - nfs-out:/ute/outbound
+      - nfs-in:/ute/inbox
+      - nfs-out:/ute/outbox
       - x265-vol:/ute/x265
     networks:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 1
       placement:
         constraints:
           - node.labels.name == nuc
       resources:
         limits:
           cpus: '4'
-          memory: 750M
+          memory: 2000M
+
 
 
   ## worker service with resource values for a different system. service name
   ## must be different from other worker service.
-  worker-lenovo:
+  worker-esx:
     environment:
-      UTE_HOSTNAME: lenovo
+      UTE_HOSTNAME: esx
     depends_on:
       - redis
     image: ute:worker
     volumes:
-      - nfs-in:/ute/inbound
-      - nfs-out:/ute/outbound
+      - nfs-in:/ute/inbox
+      - nfs-out:/ute/outbox
       - x265-vol:/ute/x265
     networks:
       ute_net:
@@ -164,11 +159,11 @@ services:
       replicas: 2
       placement:
         constraints:
-          - node.labels.name == lenovo
+          - node.labels.name == esx
       resources:
         limits:
-          cpus: '1.5'
-          memory: 750M
+          cpus: '6'
+          memory: 2000M
 
 
   ## global service (one service instance per swarm host) to build x265 in a
@@ -208,16 +203,12 @@ volumes:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=10.0.1.158,rw,nolock,noresvport
-      device: ":/inbound"
-      #o: addr=10.168.1.111,rw,nolock,noresvport
-      #device: ":/mnt/user/work/ute/inbound"
+      o: addr=10.168.1.111,rw,nolock,noresvport
+      device: ":/mnt/user/work/ute/inbound"
  
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=10.0.1.158,rw,nolock,noresvport
-      device: ":/outbound"
-      #o: addr=10.168.1.111,rw,nolock,noresvport
-      #device: ":/mnt/user/work/ute/outbound"
+      o: addr=10.168.1.111,rw,nolock,noresvport
+      device: ":/mnt/user/work/ute/outbound"

@@ -1,27 +1,54 @@
 ## test user config
 ##
 ## General Settings
-task size: 300
-buffer size: 100
+general_config:
+  inbox_path: "/ute/inbox"
+  outbox_path: "/ute/outbox"
+  keep_source_file: True
+    completed_folder_name: "done"
+
+  file_poll_interval: 60
+  client_poll_interval: 60
+
+
+database_config:
+  results_poll_interval: 0.2
+  client_tcp_keepalive: 600
+  log_level: "verbose"
+  db_save: False
+  active_rehashing: False
+
+
+task_config:
+  log_level: "info"
+  task_size: 300
+  buffer_size: 100
+  job_timeout: 600
+  crop_sample_count: 31
+  timeOffsetPercent: 0.15
+
+
+crop_config:
+  cropdetect: "24:16:0"
+
+
+## NFS Share Settings
+nfs_config:
+  server address: 10.168.1.111
+  inbox path: /mnt/user/work/ute/inbox
+  outbox path: /mnt/user/work/ute/outbox
+
+
 
 ## FFmpeg settings
 ## command args will be run in order, so make sure there's no conficts
 ## if you add/remove arguments
-#ffmpeg:
+ffmpeg_config:
+##  ss: ute_reserved
+##  i: ute_reserved
+## crop: ute_reserved; see 'crop_config' section above
+  loglevel: fatal
 #  hide_banner: 
-#  loglevel: fatal
-#  ss: ute_reserved
-#  i: ute_reserved
-# crop:
 
 
-
-## Error handling
-timeout: 20
-
-
-## NFS Share Settings
-server address: 10.168.1.111
-inbound path: /mnt/user/work/ute/inbound
-outbound path: /mnt/user/work/ute/outbound
 
