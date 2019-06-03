@@ -26,7 +26,7 @@ rand=$(( ( RANDOM % 10000 ) + 1 ))
 while true; do
   cd /home/utbot/utecode
   rqworker -u "redis://redis" --name "$rand@$UTE_HOSTNAME" \
-    --path '/home/utbot/utecode' high medium low
+    --path '/home/utbot/utecode' high low
   
   echo "Worker restarting?!?!?!"
   sleep 10

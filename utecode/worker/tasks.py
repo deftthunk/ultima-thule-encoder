@@ -1,4 +1,5 @@
 from time import sleep
+from platform import node
 import re, os
 import logging
 import subprocess
@@ -21,11 +22,8 @@ def encode(cmd):
     fps = parseFPS(status.stdout)
     fileCheck(cmd)
     logging.debug("====================================")
-    logging.debug("")
-    logging.debug("")
-    logging.debug("")
 
-    return fps
+    return (fps, hostname(), nodename())
 
 
 ## find the last printout of x265's 'frames per second' estimate, which ought
@@ -42,7 +40,17 @@ def parseFPS(string):
     else:
         logging.debug("fps return fail!!!")
         return 00
-    
+
+
+## get UTE assigned hostname (from Dockerfile)
+def hostname():
+    name = os.environ['UTE_HOSTNAME']
+    return name.rstrip()
+
+## get docker swarm assigned hostname
+def nodename():
+    clientId = node()
+    return clientId.rstrip()
 
 ## debugging function
 def fileCheck(cmd):

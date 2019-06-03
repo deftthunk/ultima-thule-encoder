@@ -21,7 +21,7 @@ RUN apt-get update && \
 
 VOLUME [ "/ute/x265" ]
 
-## become user 'utbot', change working dir, install Celery
+## become user 'utbot', change working dir, install RQ
 USER utbot
 WORKDIR /home/utbot
 RUN pip3 install rq --user

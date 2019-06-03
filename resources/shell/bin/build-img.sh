@@ -14,6 +14,7 @@ fi
 
 if [[ $1 ]]; then
   oldId=`docker image ls -q ute:$1`
+  sleep 1
   docker build -f $uteRootPath/config/dockerfiles/Dockerfile.$1 -t ute:$1 $uteRootPath
   sleep 1
   echo "> Deleting old image: $oldId"

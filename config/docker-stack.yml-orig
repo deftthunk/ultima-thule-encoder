@@ -182,31 +182,6 @@ services:
           cpus: '6'
           memory: 2000M
 
-  ## worker service with resource values for a different system. service name
-  ## must be different from other worker service.
-  worker-pandora:
-    environment:
-      UTE_HOSTNAME: pandora
-    depends_on:
-      - redis
-    image: ute:worker
-    volumes:
-      - nfs-in:/ute/inbox
-      - nfs-out:/ute/outbox
-      - x265-vol:/ute/x265
-    networks:
-      ute_net:
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints:
-          - node.labels.name == pandora
-      resources:
-        limits:
-          cpus: '1'
-          memory: 2000M
-          
 
   ## global service (one service instance per swarm host) to build x265 in a
   ## local volume, to be accessed by any local container

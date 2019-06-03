@@ -1,12 +1,18 @@
-- asynchronously prep the next video file for encoding. especially useful if
-  there's a file with VFR that we need to count frames on in the background
-
 - make async function to determine average fps being encoded on swarm
-
-- make x265-builder image for global deployment
-
 - figure out windows madness
+- dynamically add/remove workers to/from swarm
+- logging
+- config
+- 
+- fix: only one high task gets queued at a time
+- fix: requeuing failed jobs sends them to back of queue
+- python TUI
+- watchdog (dynamically change timeout, restart failed workers, finish failed tasks)
 
+
+
+
+ansible stuff
 - ansible: for redis host, set host system parameters to stop warnings:
   echo never > /sys/kernel/mm/transparent_hugepage/enabled
   echo never > /sys/kernel/mm/transparent_hugepage/defrag

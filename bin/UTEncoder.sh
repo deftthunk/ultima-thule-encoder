@@ -9,7 +9,7 @@ scriptPath=`dirname $script`
 ## docker-stack.yml, deploy it as a "stack" to the swarm, and name the 
 ## stack instance 'utestack'
 if [[ -z $1 ]] || [[ $1 == 'up' ]]; then
-  docker stack deploy --compose-file $scriptPath/../config/docker-stack.yml $stackName
+  docker stack deploy --prune --compose-file $scriptPath/../config/docker-stack.yml $stackName
 
 elif [[ $1 == 'down' ]]; then
   docker stack rm $stackName

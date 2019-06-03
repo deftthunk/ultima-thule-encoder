@@ -14,12 +14,13 @@ from .task import Task
 inbox = "/ute/inbox"
 outbox = "/ute/outbox"
 doneDir = "done"
-debug = False
 highPriorityDir = "high"
-config_jobTimeout = 600
+debug = False
+config_jobTimeout = 360
 config_cropSampleCount = 13
 config_timeOffsetPercent = 0.15
-task_workers = 0
+config_frameBufferSize = 100
+config_jobSize = 400
 
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 logging.basicConfig(level=logging.DEBUG)
@@ -76,35 +77,55 @@ def findWork(workQLow, workQHigh, threadKeeper):
     ## the current queues) are not re-introduced to UTE. If not found in the
     ## threadKeeper keys list (activeFiles), then append the list of new files
     ## to the correct queue
-    if set(newLowFiles).intersection(activeFilesLow) == set() and len(newLowFiles) > 0:
-        logging.debug("Files found: " + str(len(newLowFiles)))
-        workQLow.extend([entry for entry in newLowFiles])
-    if set(newHighFiles).intersection(activeFilesHigh) == set() and len(newHighFiles) > 0:
-        logging.debug("High Priority files found: " + str(len(newHighFiles)))
-        workQHigh.extend([entry for entry in newHighFiles])
+    totalNewFiles = 0
+    lowIntersect = set(newLowFiles).intersection(activeFilesLow)
+    highIntersect = set(newHighFiles).intersection(activeFilesHigh)
 
-    return len(newLowFiles) + len(newHighFiles)
+    if lowIntersect == set() and len(newLowFiles) > 0:
+        logging.info("Low Priority file(s) found: " + str(len(newLowFiles)))
+        logging.debug("Low set intersection " + str(set(newLowFiles).intersection(activeFilesLow)))
+        workQLow.extend([entry for entry in newLowFiles])
+        totalNewFiles += len(newLowFiles)
+        logging.debug("workQLow: " + str(workQLow))
+
+    if highIntersect == set() and len(newHighFiles) > 0:
+        logging.info("High Priority file(s) found: " + str(len(newHighFiles)))
+        logging.debug("High set intersection " + str(set(newHighFiles).intersection(activeFilesHigh)))
+        workQHigh.extend([entry for entry in newHighFiles])
+        totalNewFiles += len(newHighFiles)
+        logging.debug("workQHigh: " + str(workQHigh))
+
+    return totalNewFiles
 
 
 '''
 find clients using the broker container to get a count of 
 available workers in the swarm
 '''
-def getClientCount(redisLink):
+def getClientCount(redisLink, workerList):
     workers = Worker.all(connection=redisLink)
-    #logging.info("Found " + str(len(workers)) + " workers")
+    logging.debug("Found " + str(len(workers)) + " workers")
 
-    #for worker in workers:
-    #    logging.info(str(worker.name))
+    if not len(workers) == len(workerList):
+        change = set(workers).symmetric_difference(set(workerList))
+        if len(workers) > len(workerList):
+            logging.info("New worker(s): ")
+            for worker in change:
+                logging.info(str(worker.name))
+        else:
+            logging.info("Lost worker(s): ")
+            for worker in change:
+                logging.info(str(worker.name))
 
-    return len(workers)
+        logging.info("{} active workers".format(len(workers)))
+
+    return len(workers), workers
 
 
-
-
-def taskManager(q, redisLink, targetFile):
-    task_workers = getClientCount(redisLink)
-
+'''
+tbd
+'''
+def taskManager(q, redisLink, targetFile, taskWorkers):
     ## create and initialize new 'Task' object
     task = Task({ \
             'inbox' : inbox,
@@ -115,7 +136,9 @@ def taskManager(q, redisLink, targetFile):
             'jobTimeout' : config_jobTimeout,
             'cropSampleCount' : config_cropSampleCount,
             'timeOffsetPercent' : config_timeOffsetPercent,
-            'workers' : task_workers })
+            'frameBufferSize' : config_frameBufferSize,
+            'jobSize' : config_jobSize,
+            'workers' : taskWorkers })
 
 
     frameCountTotal, frameRate, duration = task.getFrameCount()
@@ -150,12 +173,12 @@ def taskManager(q, redisLink, targetFile):
 
 
 
-
 ## do stuff
 def main(): 
     ## note: two types of queues. one is a redis queue, the other is a python
     ## FIFO queue for organizing files
     redisLink = Redis('redis')
+    workerList = []
     rqLow = Queue('low', connection=redisLink)
     rqHigh = Queue('high', connection=redisLink)
     workQLow = deque()
@@ -163,22 +186,20 @@ def main():
     threadKeeper = {}
     highThreads, lowThreads = 0, 0
 
+    ## check for available workers
+    (workerCount, workerList) = getClientCount(redisLink, workerList)
+    if workerCount == 0:
+        logging.debug("No workers, sleeping")
+        while getClientCount(redisLink, workerList)[0] == 0:
+            sleep(30)
+
     while True:
-        ## check for files and clients
-        if findWork(workQLow, workQHigh, threadKeeper) == 0 and \
-                threading.active_count() < 2:
+        ## check for files
+        fwReturn = findWork(workQLow, workQHigh, threadKeeper)
+        if fwReturn == 0 and len(threadKeeper) == 0:
             logging.info("No files; UTE sleeping")
             while findWork(workQLow, workQHigh, threadKeeper) == 0:
                 sleep(30)
-                continue
-
-        ## are there workers available
-        if getClientCount(redisLink) == 0:
-            logging.debug("No workers, sleeping")
-            while getClientCount(redisLink) == 0:
-                sleep(30)
-                continue
-
 
         ## determine if we're pulling work from High or Low queue
         targetQueue = None
@@ -196,7 +217,7 @@ def main():
                 highThreads += 1
             except IndexError:
                 logging.error("Unable to find files in High Queue")
-                continue
+
         elif lowThreads < 2 and len(workQLow) > 0:
             try:
                 logging.debug("Queing low priority work")
@@ -206,14 +227,13 @@ def main():
                 lowThreads += 1
             except IndexError:
                 logging.error("Unable to find files in Low Queue")
-                continue
 
         ## if it was determined above that a new thread should be created,
         ## make it and start it, adding the thread object to threadKeeper
         if newThread:
             thread = threading.Thread( \
                 target = taskManager, \
-                args = (targetQueue, redisLink, targetFile))
+                args = (targetQueue, redisLink, targetFile, workerCount))
 
             logging.debug("Starting thread")
             thread.start()
@@ -239,7 +259,7 @@ def main():
             del threadKeeper[delThreadItem]
 
         #logging.debug("End loop, sleep 10")
-        sleep(10)
+        sleep(15)
 
 
 

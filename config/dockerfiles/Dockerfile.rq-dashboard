@@ -1,0 +1,25 @@
+FROM debian:stretch-slim
+
+## install packages, add user 'utbot', and update shared lib path
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+        python3-pip \
+        python3-setuptools \
+        python3-wheel \
+        python3-dev \
+        apt-utils \
+        gosu && \
+	apt-get clean && \
+	rm -rf /var/lib/apt/lists/* && \
+  useradd -ms /bin/bash utbot
+
+## become user 'utbot', change working dir, install RQ
+USER utbot
+WORKDIR /home/utbot
+RUN pip3 install rq-dashboard --user
+
+COPY ./resources/rq-dashboard/run.sh /home/utbot/run.sh
+ENV PATH="/home/utbot/.local/bin:${PATH}"
+
+#CMD [ "rq-dashboard", "-u", "redis://redis" ]
+CMD [ "/home/utbot/run.sh" ]

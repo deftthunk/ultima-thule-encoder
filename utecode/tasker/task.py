@@ -24,25 +24,13 @@ class Task:
         self.cropSampleCount = configDict['cropSampleCount']
         self.timeOffsetPercent = configDict['timeOffsetPercent']
         self.task_workers = configDict['workers']
-
+        self.avgFps = {}
 
     '''
-    return the base name of a filepath. if no arg given, return the name of
-    the current file
+    return the base name of a filepath
     '''
-    def _getFileName(self, name=None):
-        fileName = ''
-        if name == None:
-            logging.debug("_getFileName(): No args, finding new work")
-            currentFileList = findWork()
-            if len(currentFileList) > 0:
-                fileName = os.path.basename(currentFileList[0])
-            else:
-                logging.error("No files in queue")
-        else:
-            fileName = os.path.basename(name)
-
-        return fileName
+    def _getFileName(self, name):
+        return os.path.basename(name)
 
 
     '''
@@ -357,6 +345,21 @@ class Task:
 
 
     '''
+
+    '''
+    def calcAvgFps(self, fps, nodename):
+        self.avgFps[nodename] = fps
+        avg = 0
+
+        ## wait for all workers to report before rolling calculations
+        if len(self.avgFps) >= self.task_workers:
+            avg = sum(float(val) for val in self.avgFps.values())
+            #self.avgFps.clear()
+            
+        return avg
+
+
+    '''
     tbd
     '''
     def waitForTaskCompletion(self, q, jobList):
@@ -364,25 +367,51 @@ class Task:
         deleteIndex = None
         pollSize = self.task_workers * 2 + 1
         jobNum = len(jobList)
+        fpsAverage = 0
         counter = 1
 
         while True:
+            newJob = None
             for i, (jobId, job) in enumerate(jobList):
                 if job.get_status() == 'finished':
-                    logging.info(str(counter) + '/' + str(jobNum) + " - FPS: " \
-                            + str(job.result) + " {" + str(jobId) + "}")
+                    (fps, hostname, nodename) = job.result
+                    ret = self.calcAvgFps(fps, nodename)
+                    if ret > 0:
+                        fpsAverage = ret
+
+                    out = "{}/{} - FPS (Total) {} ({}) <{}> {}".format( \
+                            str(counter), \
+                            str(jobNum), \
+                            str(fps), \
+                            "{0:.2f}".format(fpsAverage), \
+                            str(hostname), \
+                            str(jobId))
+
+                    logging.info(out)
                     deleteIndex = i
                     counter += 1
+                    break
+                ## re-queue a failed job by creating a new job, copying in the 
+                ## original arguments, and mapping the original job ID onto it.
+                ## then delete the old failed job, and requeue new job at front
+                ## of queue
+                elif job.is_failed == True:
+                    argsParam = job.args
+                    failRegistry.remove(job)    # is this still necessary?
+                    q.remove(job)
+                    job.delete()    # is this still necessary?
+                    deleteIndex = i
+                    logging.info("Requeing job {}".format(jobId))
+                    newJob = q.enqueue_call('tasks.encode', args=argsParam, \
+                            timeout=self.jobTimeout, job_id=jobId, at_front=True)
                     break
                 elif job.get_status() != "queued" and job.get_status() != "started":
                     logging.debug("Undocumneted Job Status: " + str(job.get_status()))
-                if job.is_failed == True:
-                    failRegistry.requeue(job)
-                    logging.info("Requeuing failed job " + jobId)
+
                 if i > pollSize:
                     break
 
-                sleep(1)
+                sleep(0.5)
 
 
     #        logging.debug("jobList Size: " + str(len(jobList)))
@@ -394,47 +423,13 @@ class Task:
     #            logging.debug("Deleting " + str(k))
                 del jobList[deleteIndex]
                 deleteIndex = None
-                sleep(1)
 
+            ## place requeued (reconstituted) job at beginning of our job list
+            ## must be in front, else polling may miss the status change
+            if not newJob == None:
+                jobList.insert(0, (newJob.id, newJob))
 
-
-
-
-    '''
-    def waitForTaskCompletion(q, jobList):
-        failRegistry = q.failed_job_registry
-        deleteIndex = None
-        pollSize = self.task_workers * 2 + 1
-        jobNum = len(jobList)
-        counter = 0
-
-        while True:
-            for i, (jobId, job) in enumerate(jobList):
-                if job.get_status() == 'finished':
-                    logging.info(str(counter) + '/' + str(jobNum) + " - FPS: " \
-                            + str(job.result) + " {" + str(jobId) + "}")
-                    deleteIndex = i
-                    counter += 1
-                    break
-                if job.is_failed == True:
-                    failRegistry.requeue(job)
-                    logging.info("Requeuing failed job " + jobId)
-                if i > pollSize:
-                    break
-
-                sleep(1)
-
-
-    #        logging.debug("jobList Size: " + str(len(jobList)))
-            if len(jobList) == 0:
-                break
-            elif deleteIndex != None:
-                ## remove completed job from jobList
-    #            (k, v) = jobList[deleteIndex]
-    #            logging.debug("Deleting " + str(k))
-                del jobList[deleteIndex]
-                deleteIndex = None
-    '''
+            sleep(1)
 
 
 

@@ -10,20 +10,9 @@
 ## and placed in "/home/utbot/" and executed. Changes here will not be 
 ## reflected in execution until a new Docker tasker image is created and 
 ## deployed.
-sleep 30
+sleep 10
 
-watchdog=0
-while true; do
-  python3 -m utecode.tasker
+export LC_ALL=C.UTF-8
+export LANG=C.UTF-8
 
-  ## if watchdog is true, we've been here before and probably caught in a loop
-  if [[ $watchdog -eq 1 ]]; then
-    echo "Tasker died again! Staying dead..."
-    exit
-  else
-    echo "Tasker died!? Sleeping for 60 seconds and respawning"
-    watchdog=1
-    sleep 60
-  fi
-done
-
+rq-dashboard -u redis://redis
