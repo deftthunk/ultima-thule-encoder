@@ -16,11 +16,11 @@ outbox = "/ute/outbox"
 doneDir = "done"
 highPriorityDir = "high"
 debug = False
-config_jobTimeout = 360
+config_jobTimeout = 480
 config_cropSampleCount = 13
 config_timeOffsetPercent = 0.15
 config_frameBufferSize = 100
-config_jobSize = 400
+config_jobSize = 300
 
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 logging.basicConfig(level=logging.DEBUG)
@@ -125,9 +125,10 @@ def getClientCount(redisLink, workerList):
 '''
 tbd
 '''
-def taskManager(q, redisLink, targetFile, taskWorkers):
+def taskManager(q, redisLink, targetFile, taskWorkers, threadId):
     ## create and initialize new 'Task' object
     task = Task({ \
+            'threadId' : threadId,
             'inbox' : inbox,
             'outbox' : outbox,
             'target' : targetFile,
@@ -140,9 +141,8 @@ def taskManager(q, redisLink, targetFile, taskWorkers):
             'jobSize' : config_jobSize,
             'workers' : taskWorkers })
 
-
     frameCountTotal, frameRate, duration = task.getFrameCount()
-    encodeTasks, outboundFile = task.buildCmdString( \
+    encodeTasks, outboundFile, chunkPaths = task.buildCmdString( \
             frameCountTotal, frameRate, duration)
 
     ## determine full path of folder for video chunks
@@ -150,26 +150,38 @@ def taskManager(q, redisLink, targetFile, taskWorkers):
     tempLen = len(tempPath)
     tempPath2 = '/'.join(tempPath[:tempLen-1])
     fullOutboundPath = '/'.join([outbox, tempPath2])
-    logging.info("Outbound path: " + str(fullOutboundPath))
-
+    logging.info("TID:{} Outbound path: {}".format(str(threadId), str(fullOutboundPath)))
     q, jobHandles = task.populateQueue(q, encodeTasks)
 
-    logging.info("Waiting on jobs...")
-    task.waitForTaskCompletion(q, jobHandles)
+    while True:
+        logging.info("TID:{} Waiting on jobs".format(str(threadId)))
+        task.waitForTaskCompletion(q, jobHandles.copy())
 
-    logging.info("Building new Matroska file")
+        sleep(7)
+
+        logging.info("TID:{} Checking work for errors".format(str(threadId)))
+        jobHandles = task.CheckForErrors(chunkPaths, jobHandles)
+
+        if len(jobHandles) > 0:
+            for jobId, job in jobHandles:
+                task.RequeueJob(job.args, q, jobId)
+        else:
+            break
+
+
+    logging.info("TID:{} Building new Matroska file".format(str(threadId)))
     noAudioFile = task.rebuildVideo(fullOutboundPath)
 
-    logging.info("Merging audio tracks into new MKV file")
+    logging.info("TID:{} Merging audio tracks into new MKV file".format(str(threadId)))
     finalFileName = task.mergeAudio(noAudioFile, fullOutboundPath)
 
     sleep(1)
-    logging.info("Clearing out '.265' chunk files")
+    logging.info("TID:{} Clearing out '.265' chunk files".format(str(threadId)))
     task.cleanOutFolder(fullOutboundPath, finalFileName)
 
     sleep(1)
     task.indicateCompleted()
-    logging.info("\nFinished " + targetFile)
+    logging.info("\nTID:{} Finished {}".format(str(threadId), str(targetFile)))
 
 
 
@@ -184,6 +196,7 @@ def main():
     workQLow = deque()
     workQHigh = deque()
     threadKeeper = {}
+    threadId = 0
     highThreads, lowThreads = 0, 0
 
     ## check for available workers
@@ -228,12 +241,20 @@ def main():
             except IndexError:
                 logging.error("Unable to find files in Low Queue")
 
-        ## if it was determined above that a new thread should be created,
-        ## make it and start it, adding the thread object to threadKeeper
+        '''
+        if it was determined above that a new thread should be created,
+        make it and start it, adding the thread object to threadKeeper
+        '''
         if newThread:
+            ## create a numerical id to differentiate threads in log output
+            threadId += 1
+            if threadId > 9999:
+                threadId = 1
+
             thread = threading.Thread( \
                 target = taskManager, \
-                args = (targetQueue, redisLink, targetFile, workerCount))
+                args = (targetQueue, redisLink, targetFile, workerCount, \
+                threadId))
 
             logging.debug("Starting thread")
             thread.start()

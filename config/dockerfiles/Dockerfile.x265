@@ -1,4 +1,4 @@
-FROM debian:testing-slim
+FROM debian:buster-slim
 
 ## add x265, its shared libraries, and paths
 COPY ./resources/x265 /data

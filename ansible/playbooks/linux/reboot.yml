@@ -1,7 +1,0 @@
----
-- hosts: all
-  become: yes
-  tasks:
-  - name: Reboot machine and wait (in case of slow boot-up)
-    reboot:
-      reboot_timeout: 3600

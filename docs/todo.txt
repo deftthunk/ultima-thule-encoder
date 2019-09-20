@@ -1,14 +1,16 @@
-- make async function to determine average fps being encoded on swarm
+- COMPLETED|make async function to determine average fps being encoded on swarm
 - figure out windows madness
 - dynamically add/remove workers to/from swarm
 - logging
 - config
 - 
 - fix: only one high task gets queued at a time
-- fix: requeuing failed jobs sends them to back of queue
+- COMPLETED|fix: requeuing failed jobs sends them to back of queue
 - python TUI
 - watchdog (dynamically change timeout, restart failed workers, finish failed tasks)
 
+- coastdown/shutdown
+- notice when a worker goes down, and requeue their work. otherwise the job hanges indefinitely
 
 
 

@@ -1,4 +1,4 @@
-version: '3.5'
+version: '3.7'
 services:
 
   ## registry service for storing and serving built images locally to the swarm
@@ -50,7 +50,7 @@ services:
         protocol: tcp
         mode: ingress
     deploy:
-      replicas: 1
+      replicas: 0
       placement:
         constraints: [node.role == manager]
     networks:
@@ -120,13 +120,13 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 6
+      replicas: 4
       placement:
         constraints:
           - node.labels.name == smaug
       resources:
         limits:
-          cpus: '8.0'
+          cpus: '6.0'
           memory: 2000M
 
 
@@ -156,7 +156,6 @@ services:
           memory: 2000M
 
 
-
   ## worker service with resource values for a different system. service name
   ## must be different from other worker service.
   worker-esx:
@@ -179,8 +178,9 @@ services:
           - node.labels.name == esx
       resources:
         limits:
-          cpus: '6'
+          cpus: '5'
           memory: 2000M
+
 
   ## worker service with resource values for a different system. service name
   ## must be different from other worker service.
@@ -198,7 +198,7 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 1
+      replicas: 0
       placement:
         constraints:
           - node.labels.name == pandora
