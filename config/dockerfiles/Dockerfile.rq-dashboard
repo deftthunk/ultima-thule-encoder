@@ -1,4 +1,4 @@
-FROM debian:stretch-slim
+FROM debian:buster-slim
 
 ## install packages, add user 'utbot', and update shared lib path
 RUN apt-get update && \
@@ -13,13 +13,15 @@ RUN apt-get update && \
 	rm -rf /var/lib/apt/lists/* && \
   useradd -ms /bin/bash utbot
 
-## become user 'utbot', change working dir, install RQ
-USER utbot
-WORKDIR /home/utbot
-RUN pip3 install rq-dashboard --user
-
 COPY ./resources/rq-dashboard/run.sh /home/utbot/run.sh
 ENV PATH="/home/utbot/.local/bin:${PATH}"
 
-#CMD [ "rq-dashboard", "-u", "redis://redis" ]
+RUN	chmod +x /home/utbot/run.sh && \
+	chown utbot:utbot /home/utbot/run.sh
+
+## become user 'utbot', change working dir, install RQ
+USER utbot
+WORKDIR /home/utbot
+RUN pip3 install rq-dashboard --user 
+
 CMD [ "/home/utbot/run.sh" ]

@@ -10,4 +10,7 @@ while true; do
 done
 
 ldconfig
+echo "executing..."
+chmod 555 /home/utbot/run.sh
+chmod -R 777 /home/utbot/utecode
 exec gosu utbot /home/utbot/run.sh

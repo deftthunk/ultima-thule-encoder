@@ -15,4 +15,4 @@ sleep 10
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 
-rq-dashboard -u redis://redis
+rq-dashboard -u redis://redis:6379

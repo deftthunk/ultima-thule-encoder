@@ -6,12 +6,14 @@
 - 
 - fix: only one high task gets queued at a time
 - COMPLETED|fix: requeuing failed jobs sends them to back of queue
+- COMPLETED|fix: starts encoding file while file still transfering to inbox
 - python TUI
 - watchdog (dynamically change timeout, restart failed workers, finish failed tasks)
 
 - coastdown/shutdown
 - notice when a worker goes down, and requeue their work. otherwise the job hanges indefinitely
-
+- sometimes requeue can be an infinite loops since same failed worker keeps getting same failed
+task. try sleeping on worker or requeue for a few seconds to avoid?
 
 
 ansible stuff

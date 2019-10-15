@@ -43,6 +43,8 @@ services:
 
   ## RQ Dashboard w/ RQ 1.0 support
   dashboard:
+    depends_on:
+      - redis
     image: ute:rq-dashboard
     ports:
       - target: 9181
@@ -120,13 +122,13 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 4
+      replicas: 0
       placement:
         constraints:
           - node.labels.name == smaug
       resources:
         limits:
-          cpus: '6.0'
+          cpus: '8.0'
           memory: 2000M
 
 
@@ -153,7 +155,7 @@ services:
       resources:
         limits:
           cpus: '4'
-          memory: 2000M
+          memory: 5000M
 
 
   ## worker service with resource values for a different system. service name
@@ -172,21 +174,21 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 2
+      replicas: 1
       placement:
         constraints:
           - node.labels.name == esx
       resources:
         limits:
-          cpus: '5'
-          memory: 2000M
+          cpus: '10'
+          memory: 4800M
 
 
   ## worker service with resource values for a different system. service name
   ## must be different from other worker service.
-  worker-pandora:
+  worker-motoko:
     environment:
-      UTE_HOSTNAME: pandora
+      UTE_HOSTNAME: motoko
     depends_on:
       - redis
     image: ute:worker
@@ -201,12 +203,12 @@ services:
       replicas: 0
       placement:
         constraints:
-          - node.labels.name == pandora
+          - node.labels.name == motoko
       resources:
         limits:
-          cpus: '1'
-          memory: 2000M
-          
+          cpus: '4'
+          memory: 6000M
+
 
   ## global service (one service instance per swarm host) to build x265 in a
   ## local volume, to be accessed by any local container
@@ -246,11 +248,11 @@ volumes:
     driver_opts:
       type: nfs
       o: addr=10.168.1.111,rw,nolock,noresvport
-      device: ":/mnt/user/work/ute/inbound"
+      device: ":/mnt/user/work/ute/inbox"
  
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
       o: addr=10.168.1.111,rw,nolock,noresvport
-      device: ":/mnt/user/work/ute/outbound"
+      device: ":/mnt/user/work/ute/outbox"

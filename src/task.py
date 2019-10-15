@@ -28,12 +28,33 @@ class Task:
         self.jobSize = configDict['jobSize']
         self.frameBufferSize = configDict['frameBufferSize']
         self.avgFps = {}
+        self.outboundFolderPath = self.MakeOutboundFolderPath()
+
 
     '''
     return the base name of a filepath
     '''
     def _getFileName(self, name):
         return os.path.basename(name)
+
+
+    '''
+    return the name of this file's outbox folder, and make it if it doesn't
+    yet exist in outbox
+    '''
+    def MakeOutboundFolderPath(self):
+        newFolder = self._getFileName(self.target)
+        newPath = '/'.join([self.outbox, newFolder])
+        ## make it if it doesn't exist
+        try:
+            os.makedirs(newPath, 0o777, exist_ok=True)
+        except(FileNotFoundError) as error:
+            logging.info("TID:{} Unable to create 'outbox' folder or subfolder".format( \
+                str(self.threadId)))
+            logging.error("TID:{} Error: {}".format(str(self.threadId), str(error)))
+            return False
+
+        return newPath
 
 
     '''
@@ -193,9 +214,6 @@ class Task:
             namePart = ''
             fileName = self._getFileName(self.target)
             newFolder = fileName
-            newPath = '/'.join([self.outbox, newFolder])
-            os.makedirs(newPath, 0o777, exist_ok=True)
-            #logging.info("TID:{} Outbound path: {}".format(str(self.threadId), str(newPath)))
 
             ## use part (or all) of the filename to help name chunks
             if len(fileName) > 10:
@@ -253,7 +271,7 @@ class Task:
                     -strict \
                     -1 \
                     -f yuv4mpegpipe - | x265 - \
-                    --log-level debug \
+                    --log-level info \
                     --no-open-gop \
                     --frames {fr} \
                     --chunk-start {cs} \
@@ -337,6 +355,42 @@ class Task:
 
 
     '''
+    look for existing files in the target's outbound folder. if present, count the number
+    of jobs done, then attempt to estimate where to pick up by finding the number of 
+    workers present, and subtract that from the jobs found. pass the encodeTasks
+    list back with a starting index reflecting a subtraction of jobs found.
+    '''
+    def CheckForPriorWork(self, encodeTasks, chunkPaths, numOfWorkers):
+        ## var for determining our starting point in encodeTasks
+        startIndex = 0
+
+        for folder, chunk in chunkPaths:
+            if os.path.isfile('/'.join([folder, chunk])):
+                startIndex += 1
+
+        if startIndex > 0:
+            '''
+            since we've found existing progress, we're not sure which was the last fully
+            completed chunk. So we're going to assume that if there are 'n' number of 
+            workers available, they're probably the same number of workers from last 
+            time. Tasks done minus 'n'. But, just in case one worker is slower than the 
+            others, or we have a very small number or workers, lets just multiply them 
+            by three, and repeat that work.
+
+            If very little work was done, then forget it and just restart at 0.
+            '''
+            if startIndex > numOfWorkers * 3:
+                startIndex -= numOfWorkers * 3
+            else:
+                startIndex = 0
+
+            logging.info("TID:{} Found existing work. Picking up at {}".format(
+                str(self.threadId), str(startIndex)))
+
+        return encodeTasks, encodeTasks[startIndex:]
+
+
+    '''
     Queue up all tasks by calling 'encode.delay()', which is a Celery method for 
     asynchronously queuing tasks in our message broker (RabbitMQ). 'encode' is 
     referencing the custom function each Celery worker is carrying which excutes 
@@ -345,12 +399,12 @@ class Task:
     'encode.delay()' returns a handle to that task with methods for determing the 
     state of the task. Handles are stored in 'statusHandles' list for later use.
     '''
-    def populateQueue(self, q, encodeTasks):
+    def PopulateQueue(self, q, encodeTasks):
         jobHandles = []
 
         for task in encodeTasks:
             try:
-                job = q.enqueue('tasks.encode', task, job_timeout=self.jobTimeout)
+                job = q.enqueue('worker.encode', task, job_timeout=self.jobTimeout)
                 #logging.debug("TID:{} Job ID: {}".format(str(self.threadId), \
                 #      str(job.get_id())))
                 jobHandles.append((job.get_id(), job))
@@ -384,9 +438,9 @@ class Task:
 
 
     '''
-    tbd
+    poll tasks for their status, and requeue them if there's a failure
     '''
-    def waitForTaskCompletion(self, q, jobList):
+    def WaitForTaskCompletion(self, q, jobList):
         failRegistry = q.failed_job_registry
         deleteIndex = None
         pollSize = self.task_workers * 2 + 1
@@ -478,8 +532,10 @@ class Task:
                 del jobList[deleteIndex]
                 deleteIndex = None
 
-            ## place requeued (reconstituted) job at beginning of our job list
-            ## must be in front, else polling may miss the status change
+            '''
+            place requeued (reconstituted) job at beginning of our job list
+            must be in front, else polling may miss the status change
+            '''
             if not newJob == None:
                 jobList.insert(0, (newJob.id, newJob))
 
@@ -490,9 +546,18 @@ class Task:
     Requeue a job on Redis/RQ, and ensure it is positioned for immediate processing
     '''
     def RequeueJob(self, argsParam, q, jobId):
-        logging.info("TID:{} Requeing job {}".format(str(self.threadId), str(jobId)))
+        '''
+        wait a second for the worker that failed to pick a different job off 
+        the queue, just in case there's an issue with it.
+        '''
+        import pprint
 
-        newJob = q.enqueue_call('tasks.encode', args=argsParam, \
+        logging.info("TID:{} Requeing job {}".format(str(self.threadId), str(jobId)))
+        pp = pprint.PrettyPrinter()
+        ppArgsParam = pp.pformat(argsParam)
+        logging.info("TID:{} args: {}".format(str(self.threadId), str(ppArgsParam)))
+
+        newJob = q.enqueue_call('worker.encode', args=argsParam, \
                 timeout=self.jobTimeout, job_id=jobId, at_front=True)
 
         return newJob
@@ -504,7 +569,7 @@ class Task:
 
     Chunks found to be malformed are requeued for immediate processing.
     '''
-    def CheckForErrors(self, chunkPaths, jobHandles):
+    def CheckWork(self, chunkPaths, jobHandles):
         redoJobs = []
 
         '''
@@ -513,15 +578,24 @@ class Task:
         buffer size set in configuration, and won't be under 10 KB.
         '''
         for folder, chunk in chunkPaths:
-            if os.path.getsize('/'.join([folder, chunk])) < (10 * 1024):
-                logging.info("TID:{} Found failed job {}".format(str(self.threadId), \
-                        str(chunk)))
+            missing = False
+            fSize = 0
 
-                '''
-                grab the file's number from its name, and use it to locate the
-                correct index of the tuple (job_id, job) in jobHandles. push
-                the tuple to redoJobs for reprocessing
-                '''
+            try:
+                fSize = os.path.getsize('/'.join([folder, chunk]))
+            except FileNotFoundError:
+                logging.info("TID:{} Missing chunk {}".format(str(self.threadId), 
+                    str(chunk)))
+                missing = True
+
+            '''
+            grab the file's number from its name, and use it to locate the
+            correct index of the tuple (job_id, job) in jobHandles. push
+            the tuple to redoJobs for reprocessing
+            '''
+            if  missing or fSize < 10 * 1024:
+                logging.info("TID:{} Found failed job {}".format(str(self.threadId), \
+                    str(chunk)))
                 chunkName = chunk.split('/')[1]
                 chunkNumber = re.match('^(\d{3,7})_.*\.265', chunkName)
                 offender = jobHandles[int(chunkNumber.group(1))]
@@ -538,7 +612,7 @@ class Task:
 
     output file is named "noaudio_<video file name>"
     '''
-    def rebuildVideo(self, fullOutboundPath):
+    def RebuildVideo(self, fullOutboundPath):
         quiet = None
         dirList = os.listdir(fullOutboundPath)
         dirFiles = [x for x in dirList if x[-4:] == '.265']
@@ -572,7 +646,7 @@ class Task:
     '''
     tbd
     '''
-    def mergeAudio(self, noAudioFile, fullOutboundPath):
+    def MergeAudio(self, noAudioFile, fullOutboundPath):
         quiet = None
         finalFileName = '/'.join([fullOutboundPath, self._getFileName(self.target)])
         if self.debug:
@@ -598,7 +672,7 @@ class Task:
     Verify that a new video file is in the destination folder, and if so
     delete all video chunks and surplus data
     '''
-    def cleanOutFolder(self, fullOutboundPath, finalFileName):
+    def CleanOutFolder(self, fullOutboundPath, finalFileName):
         video = Path(finalFileName)
         if not video.is_file():
             logging.error("TID:{} ".format(str(self.threadId)) + \
@@ -615,7 +689,7 @@ class Task:
     '''
     creates a "done" directory and moves the completed video file into the folder.
     '''
-    def indicateCompleted(self):
+    def IndicateCompleted(self):
         ## check if completed folder is present
         doneFolder = '/'.join([self.inbox, self.doneDir])
         os.makedirs(doneFolder, 0o777, exist_ok=True)

@@ -16,11 +16,11 @@ outbox = "/ute/outbox"
 doneDir = "done"
 highPriorityDir = "high"
 debug = False
-config_jobTimeout = 480
+config_jobTimeout = 300
 config_cropSampleCount = 13
 config_timeOffsetPercent = 0.15
-config_frameBufferSize = 100
-config_jobSize = 300
+config_frameBufferSize = 75
+config_jobSize = 100
 
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 logging.basicConfig(level=logging.DEBUG)
@@ -68,22 +68,50 @@ def findWork(workQLow, workQHigh, threadKeeper):
             elif pathArr[pathCount] != doneDir:
                 newLowList.extend([os.path.join(dirPath, entry) for entry in fileNames])
 
-    ## check for new files by finding the difference between the work queue 
-    ## and the list of files we just made.
+    '''
+    check for new files by finding the difference between the work queue 
+    and the list of files we just made.
+    '''
     newLowFiles = set(newLowList).symmetric_difference(set(workQLow))
     newHighFiles = set(newHighList).symmetric_difference(set(workQHigh))
 
-    ## ensure that files currently being worked on (and therefore not found in
-    ## the current queues) are not re-introduced to UTE. If not found in the
-    ## threadKeeper keys list (activeFiles), then append the list of new files
-    ## to the correct queue
+    '''
+    ensure that files currently being worked on (and therefore not found in
+    the current queues) are not re-introduced to UTE. If not found in the
+    threadKeeper keys list (activeFiles), then append the list of new files
+    to the correct queue
+    '''
     totalNewFiles = 0
     lowIntersect = set(newLowFiles).intersection(activeFilesLow)
     highIntersect = set(newHighFiles).intersection(activeFilesHigh)
 
+
+    '''
+    detect when a file is still in the process of being copied into the inbox.
+    if so, ignore the file and we'll evaluate it again on the next pass through.
+    '''
+    def checkFileTransferProgress(files):
+        readyList = []
+
+        for f in files:
+            size1 = os.stat(f).st_size
+            sleep(2)
+            size2 = os.stat(f).st_size
+            
+            if size2 == size1:
+                readyList.append(f)
+
+        logging.info("{} of {} files ready for queuing".format(str(len(readyList)), str(len(files))))
+        return readyList
+
+
+    '''
+    look for new files by comparing the previous folder survey of inbox to the current state.
+    '''
     if lowIntersect == set() and len(newLowFiles) > 0:
         logging.info("Low Priority file(s) found: " + str(len(newLowFiles)))
         logging.debug("Low set intersection " + str(set(newLowFiles).intersection(activeFilesLow)))
+        newLowFiles = checkFileTransferProgress(newLowFiles)
         workQLow.extend([entry for entry in newLowFiles])
         totalNewFiles += len(newLowFiles)
         logging.debug("workQLow: " + str(workQLow))
@@ -91,6 +119,7 @@ def findWork(workQLow, workQHigh, threadKeeper):
     if highIntersect == set() and len(newHighFiles) > 0:
         logging.info("High Priority file(s) found: " + str(len(newHighFiles)))
         logging.debug("High set intersection " + str(set(newHighFiles).intersection(activeFilesHigh)))
+        newHighFiles = checkFileTransferProgress(newHighFiles)
         workQHigh.extend([entry for entry in newHighFiles])
         totalNewFiles += len(newHighFiles)
         logging.debug("workQHigh: " + str(workQHigh))
@@ -125,7 +154,7 @@ def getClientCount(redisLink, workerList):
 '''
 tbd
 '''
-def taskManager(q, redisLink, targetFile, taskWorkers, threadId):
+def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
     ## create and initialize new 'Task' object
     task = Task({ \
             'threadId' : threadId,
@@ -145,22 +174,40 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId):
     encodeTasks, outboundFile, chunkPaths = task.buildCmdString( \
             frameCountTotal, frameRate, duration)
 
-    ## determine full path of folder for video chunks
-    tempPath = outboundFile.split('/')
-    tempLen = len(tempPath)
-    tempPath2 = '/'.join(tempPath[:tempLen-1])
-    fullOutboundPath = '/'.join([outbox, tempPath2])
+    ## determine full path of folder for video chunks and create folder if not present
+    fullOutboundPath = task.MakeOutboundFolderPath()
     logging.info("TID:{} Outbound path: {}".format(str(threadId), str(fullOutboundPath)))
-    q, jobHandles = task.populateQueue(q, encodeTasks)
+
+    '''
+    check first to see if we're resuming a task rather than starting a new one.
+    if there's existing work already, CheckForPriorWork() will shorten the 
+    'encodeTasks' list for PopulateQueue()
+    '''
+    encodeTasksReference, encodeTasksActual = task.CheckForPriorWork(encodeTasks, \
+            chunkPaths, taskWorkers)
+
+    q, jobHandles = task.PopulateQueue(q, encodeTasksActual)
+
+    '''
+    if the task queues are different lengths, it means we are executing on
+    prior work. But we still need to create all the job objects in case there is
+    an error detected later. So, we perform a dummy version on a RQ instance that 
+    no worker is subscribed to, and generate those job objects for CheckWork(). 
+    Then delete everything in the dummy queue
+    '''
+    jobHandlesReference = None
+    if len(encodeTasksReference) != len(encodeTasksActual):
+        rqDummy, jobHandlesReference = task.PopulateQueue(rqDummy, encodeTasksReference)
+        rqDummy.empty()
+    else:
+        jobHandlesReference = jobHandles
 
     while True:
         logging.info("TID:{} Waiting on jobs".format(str(threadId)))
-        task.waitForTaskCompletion(q, jobHandles.copy())
-
-        sleep(7)
+        task.WaitForTaskCompletion(q, jobHandles.copy())
 
         logging.info("TID:{} Checking work for errors".format(str(threadId)))
-        jobHandles = task.CheckForErrors(chunkPaths, jobHandles)
+        jobHandles = task.CheckWork(chunkPaths, jobHandlesReference)
 
         if len(jobHandles) > 0:
             for jobId, job in jobHandles:
@@ -170,17 +217,17 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId):
 
 
     logging.info("TID:{} Building new Matroska file".format(str(threadId)))
-    noAudioFile = task.rebuildVideo(fullOutboundPath)
+    noAudioFile = task.RebuildVideo(fullOutboundPath)
 
     logging.info("TID:{} Merging audio tracks into new MKV file".format(str(threadId)))
-    finalFileName = task.mergeAudio(noAudioFile, fullOutboundPath)
+    finalFileName = task.MergeAudio(noAudioFile, fullOutboundPath)
 
     sleep(1)
     logging.info("TID:{} Clearing out '.265' chunk files".format(str(threadId)))
-    task.cleanOutFolder(fullOutboundPath, finalFileName)
+    task.CleanOutFolder(fullOutboundPath, finalFileName)
 
     sleep(1)
-    task.indicateCompleted()
+    task.IndicateCompleted()
     logging.info("\nTID:{} Finished {}".format(str(threadId), str(targetFile)))
 
 
@@ -193,6 +240,7 @@ def main():
     workerList = []
     rqLow = Queue('low', connection=redisLink)
     rqHigh = Queue('high', connection=redisLink)
+    rqDummy = Queue('dummy', connection=redisLink)
     workQLow = deque()
     workQHigh = deque()
     threadKeeper = {}
@@ -253,8 +301,7 @@ def main():
 
             thread = threading.Thread( \
                 target = taskManager, \
-                args = (targetQueue, redisLink, targetFile, workerCount, \
-                threadId))
+                args = (targetQueue, redisLink, targetFile, workerCount, threadId, rqDummy))
 
             logging.debug("Starting thread")
             thread.start()

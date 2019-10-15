@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ## give docker-stack time to spin up services before connecting
-echo "Waiting for Broker to start up."
+echo "Waiting for Redis to start up."
 echo "Sleeping 10 seconds"
 sleep 10
 
@@ -25,8 +25,8 @@ export LANG=C.UTF-8
 rand=$(( ( RANDOM % 10000 ) + 1 ))
 while true; do
   cd /home/utbot/utecode
-  rqworker -u "redis://redis" --name "$rand@$UTE_HOSTNAME" \
-    --path '/home/utbot/utecode' high low
+  rqworker -u "redis://redis" --name "$rand@$UTE_HOSTNAME" --verbose \
+    --logging_level "DEBUG" --path '/home/utbot/utecode' high low
   
   echo "Worker restarting?!?!?!"
   sleep 10

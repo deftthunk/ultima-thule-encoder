@@ -22,7 +22,7 @@ WORKDIR /home/utbot
 RUN pip3 install redis --user
 RUN pip3 install rq --user
 
-COPY ./utecode/tasker /home/utbot/utecode
+COPY ./src /home/utbot/utecode/
 ENV PATH="/home/utbot/.local/bin:${PATH}"
 
 ## test block
