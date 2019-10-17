@@ -382,7 +382,7 @@ class Task:
             If very little work was done, then forget it and just restart at 0.
             '''
             if startIndex > numOfWorkers * 3:
-                startIndex -= numOfWorkers * 1
+                startIndex -= numOfWorkers * 3
             else:
                 startIndex = 0
 
