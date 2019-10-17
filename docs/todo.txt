@@ -5,6 +5,9 @@
 - config
 - 
 - fix: only one high task gets queued at a time
+- fix: if checkForWork() finds existing work, the generated array of work will be
+	passed onto checkForErrors() in its truncated form, and UTE will only look at the first
+	'x' amount of chunks
 - COMPLETED|fix: requeuing failed jobs sends them to back of queue
 - COMPLETED|fix: starts encoding file while file still transfering to inbox
 - python TUI

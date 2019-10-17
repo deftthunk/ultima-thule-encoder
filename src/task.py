@@ -61,17 +61,19 @@ class Task:
     find the number of frames in the video. this can be error prone, so multiple
     methods are attempted
     '''
-    def getFrameCount(self):
+    def getFrameCount(self, method='default'):
         frameCount, frameRate, duration = None, None, None
+        mediaRet, mediaMatch, mediaFrameRate, mediaDuration = None, None, None, None
 
-        ## attempting mediainfo method
-        mediaRet = subprocess.run(["mediainfo", "--fullscan", self.target], \
-                stdout=subprocess.PIPE)
-        mediaMatch = re.search('Frame count.*?(\d+)', mediaRet.stdout.decode('utf-8'))
-        mediaFrameRate = re.search('Frame rate.*?(\d\d\d?)(\.\d\d?\d?)?', \
-                mediaRet.stdout.decode('utf-8'))
-        mediaDuration = re.search('Duration.*?\s(\d{2,})\s*\n', \
-                mediaRet.stdout.decode('utf-8'))
+        if method == 'default' or method == 'mediainfo':
+            ## attempting mediainfo method
+            mediaRet = subprocess.run(["mediainfo", "--fullscan", self.target], \
+                    stdout=subprocess.PIPE)
+            mediaMatch = re.search('Frame count.*?(\d+)', mediaRet.stdout.decode('utf-8'))
+            mediaFrameRate = re.search('Frame rate.*?(\d\d\d?)(\.\d\d?\d?)?', \
+                    mediaRet.stdout.decode('utf-8'))
+            mediaDuration = re.search('Duration.*?\s(\d{2,})\s*\n', \
+                    mediaRet.stdout.decode('utf-8'))
 
         ## get frame rate
         if mediaFrameRate.group(2):
@@ -85,7 +87,7 @@ class Task:
         ## if we cant find a frame count, we'll do it the hard way and count frames
         ## using ffprobe. this can end up being the case if the MKV stream is
         ## variable frame rate
-        if mediaMatch == None:
+        if mediaMatch == None or method == 'ffprobe':
             logging.info("TID:{} Using ffprobe".format(str(self.threadId)))
             ffprobeRet = subprocess.run(["ffprobe", \
                 "-v", \
@@ -380,7 +382,7 @@ class Task:
             If very little work was done, then forget it and just restart at 0.
             '''
             if startIndex > numOfWorkers * 3:
-                startIndex -= numOfWorkers * 3
+                startIndex -= numOfWorkers * 1
             else:
                 startIndex = 0
 
@@ -571,31 +573,74 @@ class Task:
     '''
     def CheckWork(self, chunkPaths, jobHandles):
         redoJobs = []
+        chunkStartPat = 'chunk-start\=(\d+)'
 
         '''
         Look at file sizes, and anything below 10 KB in size, consider a failed chunk.
         Theoretically, the last chunk should never be smaller than the designated frame
         buffer size set in configuration, and won't be under 10 KB.
+
+        'chunkPaths is comprised of 'folder' which is the path to the outbox, and 'chunk',
+        which is the subpath of "title folder/chunk name"
         '''
         for folder, chunk in chunkPaths:
             missing = False
+            frameCountExpected = 1
+            frameCountFound = 0
             fSize = 0
+            path = '/'.join([folder, chunk])
 
             try:
+                ## if only file header found, consider missing
                 fSize = os.path.getsize('/'.join([folder, chunk]))
+                if fSize < 4 * 1024:
+                    missing = True
+                else:
+                    ffprobeRet = subprocess.run(["ffprobe", \
+                        "-v", \
+                        "error", \
+                        "-count_frames", \
+                        "-select_streams", \
+                        "v:0", \
+                        "-show_entries", \
+                        "stream=nb_read_frames", \
+                        "-of", \
+                        "default=nokey=1:noprint_wrappers=1", \
+                        path], stdout=subprocess.PIPE)
+
+                    frameCountFound = ffprobeRet.stdout.decode('utf-8')
+                    frameCountFound = int(frameCountFound) - 1  ## off by one
+                    data = subprocess.run(["mediainfo", "--fullscan", path], stdout=subprocess.PIPE)
+                    chunkStart = re.search("chunk-start\=(\d+)", data.stdout.decode('utf-8'))
+                    chunkEnd = re.search("chunk-end\=(\d+)", data.stdout.decode('utf-8'))
+
+                    '''
+                    on first chunk, chunkStart isn't specififed since it starts from frame 0. So 
+                    we'll just use chunkEnd as the expected frame count.
+                    '''
+                    if chunkStart == None and chunkEnd.group(1):
+                        frameCountExpected = int(chunkEnd.group(1)) - 1  ## off by one
+                    else:
+                        logging.debug("chunkStart: " + chunkStart.group(1))
+                        frameCountExpected = int(chunkEnd.group(1)) - int(chunkStart.group(1))
+
+                    logging.debug("chunkEnd: " + chunkEnd.group(1))
+                    logging.debug("TID:{} FramesFound: {} FramesExpected: {}".format( \
+                        str(self.threadId), str(frameCountFound), str(frameCountExpected)))
             except FileNotFoundError:
-                logging.info("TID:{} Missing chunk {}".format(str(self.threadId), 
-                    str(chunk)))
+                ## exception handling in desperate need of reworking
+                logging.info("TID:{} Missing chunk {}".format(str(self.threadId), str(chunk)))
                 missing = True
+
 
             '''
             grab the file's number from its name, and use it to locate the
             correct index of the tuple (job_id, job) in jobHandles. push
             the tuple to redoJobs for reprocessing
             '''
-            if  missing or fSize < 10 * 1024:
-                logging.info("TID:{} Found failed job {}".format(str(self.threadId), \
-                    str(chunk)))
+            #if  missing or fSize < 10 * 1024:
+            if missing or (int(frameCountExpected) != int(frameCountFound)):
+                logging.info("TID:{} Found failed job {}".format(str(self.threadId), str(chunk)))
                 chunkName = chunk.split('/')[1]
                 chunkNumber = re.match('^(\d{3,7})_.*\.265', chunkName)
                 offender = jobHandles[int(chunkNumber.group(1))]

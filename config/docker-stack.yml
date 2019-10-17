@@ -148,7 +148,7 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 1
+      replicas: 0
       placement:
         constraints:
           - node.labels.name == nuc
@@ -174,7 +174,7 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 1
+      replicas: 0
       placement:
         constraints:
           - node.labels.name == esx
@@ -182,6 +182,58 @@ services:
         limits:
           cpus: '10'
           memory: 4800M
+
+
+  ## worker service with resource values for a different system. service name
+  ## must be different from other worker service.
+  worker-kvm:
+    environment:
+      UTE_HOSTNAME: kvm
+    depends_on:
+      - redis
+    image: ute:worker
+    volumes:
+      - nfs-in:/ute/inbox
+      - nfs-out:/ute/outbox
+      - x265-vol:/ute/x265
+    networks:
+      ute_net:
+    deploy:
+      mode: replicated
+      replicas: 0
+      placement:
+        constraints:
+          - node.labels.name == kvm
+      resources:
+        limits:
+          cpus: '4'
+          memory: 3000M
+
+
+  ## worker service with resource values for a different system. service name
+  ## must be different from other worker service.
+  worker-minion:
+    environment:
+      UTE_HOSTNAME: minion
+    depends_on:
+      - redis
+    image: ute:worker
+    volumes:
+      - nfs-in:/ute/inbox
+      - nfs-out:/ute/outbox
+      - x265-vol:/ute/x265
+    networks:
+      ute_net:
+    deploy:
+      mode: replicated
+      replicas: 0
+      placement:
+        constraints:
+          - node.labels.name == minion
+      resources:
+        limits:
+          cpus: '4'
+          memory: 3000M
 
 
   ## worker service with resource values for a different system. service name
@@ -200,14 +252,15 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 4
       placement:
         constraints:
           - node.labels.name == motoko
       resources:
         limits:
           cpus: '4'
-          memory: 6000M
+          memory: 3800M
+
 
 
   ## global service (one service instance per swarm host) to build x265 in a
@@ -247,12 +300,16 @@ volumes:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=10.168.1.111,rw,nolock,noresvport
-      device: ":/mnt/user/work/ute/inbox"
+      o: addr=10.41.0.109,rw,nolock,noresvport
+#      o: addr=10.168.1.111,rw,nolock,noresvport
+      device: ":/volume1/ute/inbox"
+#      device: ":/mnt/user/work/ute/inbox"
  
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=10.168.1.111,rw,nolock,noresvport
-      device: ":/mnt/user/work/ute/outbox"
+      o: addr=10.41.0.109,rw,nolock,noresvport
+#      o: addr=10.168.1.111,rw,nolock,noresvport
+      device: ":/volume1/ute/outbox"
+#      device: ":/mnt/user/work/ute/outbox"

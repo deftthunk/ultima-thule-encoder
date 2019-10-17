@@ -19,8 +19,8 @@ debug = False
 config_jobTimeout = 300
 config_cropSampleCount = 13
 config_timeOffsetPercent = 0.15
-config_frameBufferSize = 75
-config_jobSize = 100
+config_frameBufferSize = 100
+config_jobSize = 150
 
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 logging.basicConfig(level=logging.DEBUG)
