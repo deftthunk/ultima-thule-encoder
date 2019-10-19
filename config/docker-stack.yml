@@ -252,13 +252,13 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 4
+      replicas: 3
       placement:
         constraints:
           - node.labels.name == motoko
       resources:
         limits:
-          cpus: '4'
+          cpus: '5'
           memory: 3800M
 
 

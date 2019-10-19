@@ -20,7 +20,8 @@ config_jobTimeout = 300
 config_cropSampleCount = 13
 config_timeOffsetPercent = 0.15
 config_frameBufferSize = 100
-config_jobSize = 150
+config_jobSize = 300
+config_checkWorkThreadCount = 4
 
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 logging.basicConfig(level=logging.DEBUG)
@@ -207,7 +208,56 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
         task.WaitForTaskCompletion(q, jobHandles.copy())
 
         logging.info("TID:{} Checking work for errors".format(str(threadId)))
-        jobHandles = task.CheckWork(chunkPaths, jobHandlesReference)
+        threadArray = []
+        jobHandlesTemp = []
+        tCount = config_checkWorkThreadCount
+        checkSize = int(len(chunkPaths) / tCount)
+
+        '''
+        Once WaitForTaskCompletion has finished, initiate a check on the chunks of video to ensure
+        there are no errors. This is done via CheckWork(). But because CheckWork() is highly I/O
+        dependent in network scenarios, UTE speeds up this process by using multiple concurrent
+        threads, and passing each CheckWork() thread a block of chunks to check.
+        '''
+        for t in range(tCount):
+            ## prime jobHandlesTemp
+            jobHandlesTemp.append([])
+
+            start = t * checkSize
+            end = (t+1) * checkSize
+
+            ## in case we come up short on math, make sure last thread gets the rest
+            if t == tCount - 1:
+                end = len(chunkPaths) - 1
+
+            logging.debug("TID:{} CheckWork() range start/end: {} / {}".format(str(threadId),
+                str(start), str(end)))
+
+            '''
+            Create a thread as many times as configured by the user. These threads run CheckWork() 
+            concurrently, passing it a portion of the chunk list to verify, the job handle objects
+            used to create those chunks, a reference to a temporary array to return their list of 
+            chunks requiring requeing, and the index in which to place their array of failed chunks
+            '''
+            thread = threading.Thread( \
+                target = task.CheckWork, \
+                args = (chunkPaths[start:end], jobHandlesReference[start:end], jobHandlesTemp, t))
+
+            logging.debug("TID:{} Starting CheckWork thread {}".format(str(threadId), str(t)))
+            thread.start()
+            threadArray.append(thread)
+
+        ## wait for CheckWork() threads to finish 
+        logging.info("waiting for check threads")
+        for i, _ in enumerate(threadArray):
+            threadArray[i].join()
+
+        ## combine the failed chunks of all CheckWork() threads into jobHandles[]
+        jobHandles = []
+        for array in jobHandlesTemp:
+            jobHandles += array
+
+        #jobHandles = task.CheckWork(chunkPaths, jobHandlesReference)
 
         if len(jobHandles) > 0:
             for jobId, job in jobHandles:

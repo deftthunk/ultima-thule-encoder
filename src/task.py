@@ -382,7 +382,7 @@ class Task:
             If very little work was done, then forget it and just restart at 0.
             '''
             if startIndex > numOfWorkers * 3:
-                startIndex -= numOfWorkers * 3
+                startIndex -= numOfWorkers * 1
             else:
                 startIndex = 0
 
@@ -570,8 +570,16 @@ class Task:
     normally manifest themselves in the form of very small or zero byte files.
 
     Chunks found to be malformed are requeued for immediate processing.
+
+    CheckWork() is given a reference to "returnArray" and an offset for writing to that array.
+    This is important since several threaded instances of CheckWork will be running
+    concurrently, and need to dump their results into one location without stomping on any
+    other instance. So in this case, CheckWork() does not explicitly return anything.
+
+    @Return:
+        N/A
     '''
-    def CheckWork(self, chunkPaths, jobHandles):
+    def CheckWork(self, chunkPaths, jobHandles, returnArray, returnIndex):
         redoJobs = []
         chunkStartPat = 'chunk-start\=(\d+)'
 
@@ -595,6 +603,7 @@ class Task:
                 fSize = os.path.getsize('/'.join([folder, chunk]))
                 if fSize < 4 * 1024:
                     missing = True
+                #elif fSize < 500 * 1024:
                 else:
                     ffprobeRet = subprocess.run(["ffprobe", \
                         "-v", \
@@ -613,18 +622,39 @@ class Task:
                     data = subprocess.run(["mediainfo", "--fullscan", path], stdout=subprocess.PIPE)
                     chunkStart = re.search("chunk-start\=(\d+)", data.stdout.decode('utf-8'))
                     chunkEnd = re.search("chunk-end\=(\d+)", data.stdout.decode('utf-8'))
+                    totalFrames = re.search("total-frames\=(\d+)", data.stdout.decode('utf-8'))
 
                     '''
                     on first chunk, chunkStart isn't specififed since it starts from frame 0. So 
                     we'll just use chunkEnd as the expected frame count.
                     '''
-                    if chunkStart == None and chunkEnd.group(1):
-                        frameCountExpected = int(chunkEnd.group(1)) - 1  ## off by one
+                    if chunkStart == None: 
+                        try:
+                        #if chunkEnd.group(1):
+                            frameCountExpected = int(chunkEnd.group(1)) - 1  ## off by one
+                        except AttributeError as error:
+                            missing = True
+                            logging.warning("TID:{} chunkStart, chunkEnd missing! :: {}".format(
+                                str(self.threadId), str(error)))
+                            logging.warning("TID:{} chunk: ".format(str(self.threadId), str(path)))
+                            logging.warning("TID:{} flagging chunk for requeue".format(str(self.threadId)))
+                            logging.debug("data : " + str(data.stdout.decode('utf-8')))
+                    elif chunkEnd == None:
+                        try:
+                        #if chunkStart.group(1):
+                            frameCountExpected = int(totalFrames) - int(chunkStart.group(1))
+                            logging.debug("total-frames: " + str(totalFrames))
+                            logging.debug("chunk: " + str(path))
+                        except AttributeError as error:
+                            missing = True
+                            logging.error("TID:{} chunkStart, chunkEnd missing! Error: {}".format(
+                                str(self.threadId), str(error)))
+                            logging.error("chunk: " + str(path))
                     else:
                         logging.debug("chunkStart: " + chunkStart.group(1))
+                        logging.debug("chunkEnd: " + chunkEnd.group(1))
                         frameCountExpected = int(chunkEnd.group(1)) - int(chunkStart.group(1))
 
-                    logging.debug("chunkEnd: " + chunkEnd.group(1))
                     logging.debug("TID:{} FramesFound: {} FramesExpected: {}".format( \
                         str(self.threadId), str(frameCountFound), str(frameCountExpected)))
             except FileNotFoundError:
@@ -646,8 +676,9 @@ class Task:
                 offender = jobHandles[int(chunkNumber.group(1))]
                 redoJobs.append(offender)
 
-        
-        return redoJobs
+
+        returnArray[returnIndex] = redoJobs
+        #return redoJobs
 
 
     '''
