@@ -3,25 +3,21 @@
 - dynamically add/remove workers to/from swarm
 - logging
 - config
-- 
-- fix: only one high task gets queued at a time
-- fix: if checkForWork() finds existing work, the generated array of work will be
+- watchdog (dynamically change timeout, restart failed workers, finish failed tasks)
+- detect when a worker goes down, and requeue their work. otherwise the job hanges indefinitely
+- coastdown/shutdown
+- python TUI
+
+
+BUGS:
+- only one high task gets queued at a time
+- if checkForWork() finds existing work, the generated array of work will be
 	passed onto checkForErrors() in its truncated form, and UTE will only look at the first
 	'x' amount of chunks
-- COMPLETED|fix: requeuing failed jobs sends them to back of queue
-- COMPLETED|fix: starts encoding file while file still transfering to inbox
-- python TUI
-- watchdog (dynamically change timeout, restart failed workers, finish failed tasks)
-
-- coastdown/shutdown
-- notice when a worker goes down, and requeue their work. otherwise the job hanges indefinitely
+- if a worker is added while UTE is processing, it seems not all workers in teh swarm stay active?
+- COMPLETED|: requeuing failed jobs sends them to back of queue
+- COMPLETED|: starts encoding file while file still transfering to inbox
 - sometimes requeue can be an infinite loops since same failed worker keeps getting same failed
 task. try sleeping on worker or requeue for a few seconds to avoid?
 
-
-ansible stuff
-- ansible: for redis host, set host system parameters to stop warnings:
-  echo never > /sys/kernel/mm/transparent_hugepage/enabled
-  echo never > /sys/kernel/mm/transparent_hugepage/defrag
-  sudo sysctl vm.overcommit_memory=1
 

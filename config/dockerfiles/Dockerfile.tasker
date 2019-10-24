@@ -16,7 +16,7 @@ RUN apt-get update && \
   useradd -ms /bin/bash utbot && \
   ldconfig
 
-## become user 'utbot', change working dir, install Celery
+## become user 'utbot', change working dir, install RQ
 USER utbot
 WORKDIR /home/utbot
 RUN pip3 install redis --user
@@ -25,7 +25,6 @@ RUN pip3 install rq --user
 COPY ./src /home/utbot/utecode/
 ENV PATH="/home/utbot/.local/bin:${PATH}"
 
-## test block
 COPY ./resources/tasker/run.sh /home/utbot/run.sh
 USER root
 RUN chown -R utbot:utbot /home/utbot

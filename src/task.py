@@ -581,7 +581,6 @@ class Task:
     '''
     def CheckWork(self, chunkPaths, jobHandles, returnArray, returnIndex):
         redoJobs = []
-        chunkStartPat = 'chunk-start\=(\d+)'
 
         '''
         Look at file sizes, and anything below 10 KB in size, consider a failed chunk.
@@ -630,18 +629,17 @@ class Task:
                     '''
                     if chunkStart == None: 
                         try:
-                        #if chunkEnd.group(1):
                             frameCountExpected = int(chunkEnd.group(1)) - 1  ## off by one
                         except AttributeError as error:
                             missing = True
                             logging.warning("TID:{} chunkStart, chunkEnd missing! :: {}".format(
                                 str(self.threadId), str(error)))
                             logging.warning("TID:{} chunk: ".format(str(self.threadId), str(path)))
-                            logging.warning("TID:{} flagging chunk for requeue".format(str(self.threadId)))
+                            logging.warning("TID:{} flagging chunk for requeue".format( \
+                                str(self.threadId)))
                             logging.debug("data : " + str(data.stdout.decode('utf-8')))
                     elif chunkEnd == None:
                         try:
-                        #if chunkStart.group(1):
                             frameCountExpected = int(totalFrames) - int(chunkStart.group(1))
                             logging.debug("total-frames: " + str(totalFrames))
                             logging.debug("chunk: " + str(path))
@@ -651,12 +649,13 @@ class Task:
                                 str(self.threadId), str(error)))
                             logging.error("chunk: " + str(path))
                     else:
-                        logging.debug("chunkStart: " + chunkStart.group(1))
-                        logging.debug("chunkEnd: " + chunkEnd.group(1))
+                        #logging.debug("chunkStart: " + chunkStart.group(1))
+                        #logging.debug("chunkEnd: " + chunkEnd.group(1))
                         frameCountExpected = int(chunkEnd.group(1)) - int(chunkStart.group(1))
 
-                    logging.debug("TID:{} FramesFound: {} FramesExpected: {}".format( \
-                        str(self.threadId), str(frameCountFound), str(frameCountExpected)))
+                    logging.debug("TID:{} FramesFound: {} FramesExpected: {} :: {}".format( \
+                        str(self.threadId), str(frameCountFound), str(frameCountExpected), \
+                        str(path)))
             except FileNotFoundError:
                 ## exception handling in desperate need of reworking
                 logging.info("TID:{} Missing chunk {}".format(str(self.threadId), str(chunk)))

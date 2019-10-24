@@ -1,7 +1,7 @@
 import re, os, math, sys
 import shutil
 import subprocess
-import logging
+import logging, logging.handlers
 import threading
 from collections import deque
 from pathlib import Path
@@ -16,21 +16,28 @@ outbox = "/ute/outbox"
 doneDir = "done"
 highPriorityDir = "high"
 debug = False
-config_jobTimeout = 300
+config_jobTimeout = 600
 config_cropSampleCount = 13
 config_timeOffsetPercent = 0.15
-config_frameBufferSize = 100
-config_jobSize = 300
+config_frameBufferSize = 75
+config_jobSize = 75
 config_checkWorkThreadCount = 4
 
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
+rootLogger = logging.getLogger('ute')
+rootLogger.setLevel(logging.DEBUG)
+socketHandler = logging.handlers.SocketHandler('aggregator', 
+      logging.handlers.DEFAULT_TCP_LOGGING_PORT)
+
+rootLogger.addHandler(socketHandler)
+taskerLogger = logging.getLogger('ute.tasker')
 
 
 ## delete all pending tasks in the Broker queue
 def purgeQueue(q):
     q.empty()
-    logging.info("Queued jobs purged")
+    taskerLogger.info("Queued jobs purged")
     
     #return numDeleted
 
@@ -41,7 +48,7 @@ def purgeActive(q):
         if job.get_status() == 'started':
             job.cancel
 
-    logging.info("All tasks purged")
+    taskerLogger.info("All tasks purged")
 
 
 '''
@@ -102,7 +109,8 @@ def findWork(workQLow, workQHigh, threadKeeper):
             if size2 == size1:
                 readyList.append(f)
 
-        logging.info("{} of {} files ready for queuing".format(str(len(readyList)), str(len(files))))
+        taskerLogger.info("{} of {} files ready for queuing".format(
+              str(len(readyList)), str(len(files))))
         return readyList
 
 
@@ -110,20 +118,20 @@ def findWork(workQLow, workQHigh, threadKeeper):
     look for new files by comparing the previous folder survey of inbox to the current state.
     '''
     if lowIntersect == set() and len(newLowFiles) > 0:
-        logging.info("Low Priority file(s) found: " + str(len(newLowFiles)))
-        logging.debug("Low set intersection " + str(set(newLowFiles).intersection(activeFilesLow)))
+        taskerLogger.info("Low Priority file(s) found: " + str(len(newLowFiles)))
+        taskerLogger.debug("Low set intersection " + str(set(newLowFiles).intersection(activeFilesLow)))
         newLowFiles = checkFileTransferProgress(newLowFiles)
         workQLow.extend([entry for entry in newLowFiles])
         totalNewFiles += len(newLowFiles)
-        logging.debug("workQLow: " + str(workQLow))
+        taskerLogger.debug("workQLow: " + str(workQLow))
 
     if highIntersect == set() and len(newHighFiles) > 0:
-        logging.info("High Priority file(s) found: " + str(len(newHighFiles)))
-        logging.debug("High set intersection " + str(set(newHighFiles).intersection(activeFilesHigh)))
+        taskerLogger.info("High Priority file(s) found: " + str(len(newHighFiles)))
+        taskerLogger.debug("High set intersection " + str(set(newHighFiles).intersection(activeFilesHigh)))
         newHighFiles = checkFileTransferProgress(newHighFiles)
         workQHigh.extend([entry for entry in newHighFiles])
         totalNewFiles += len(newHighFiles)
-        logging.debug("workQHigh: " + str(workQHigh))
+        taskerLogger.debug("workQHigh: " + str(workQHigh))
 
     return totalNewFiles
 
@@ -134,20 +142,20 @@ available workers in the swarm
 '''
 def getClientCount(redisLink, workerList):
     workers = Worker.all(connection=redisLink)
-    logging.debug("Found " + str(len(workers)) + " workers")
+    taskerLogger.debug("Found " + str(len(workers)) + " workers")
 
     if not len(workers) == len(workerList):
         change = set(workers).symmetric_difference(set(workerList))
         if len(workers) > len(workerList):
-            logging.info("New worker(s): ")
+            taskerLogger.info("New worker(s): ")
             for worker in change:
-                logging.info(str(worker.name))
+                taskerLogger.info(str(worker.name))
         else:
-            logging.info("Lost worker(s): ")
+            taskerLogger.info("Lost worker(s): ")
             for worker in change:
-                logging.info(str(worker.name))
+                taskerLogger.info(str(worker.name))
 
-        logging.info("{} active workers".format(len(workers)))
+        taskerLogger.info("{} active workers".format(len(workers)))
 
     return len(workers), workers
 
@@ -177,7 +185,7 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
 
     ## determine full path of folder for video chunks and create folder if not present
     fullOutboundPath = task.MakeOutboundFolderPath()
-    logging.info("TID:{} Outbound path: {}".format(str(threadId), str(fullOutboundPath)))
+    taskerLogger.info("TID:{} Outbound path: {}".format(str(threadId), str(fullOutboundPath)))
 
     '''
     check first to see if we're resuming a task rather than starting a new one.
@@ -204,10 +212,10 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
         jobHandlesReference = jobHandles
 
     while True:
-        logging.info("TID:{} Waiting on jobs".format(str(threadId)))
+        taskerLogger.info("TID:{} Waiting on jobs".format(str(threadId)))
         task.WaitForTaskCompletion(q, jobHandles.copy())
 
-        logging.info("TID:{} Checking work for errors".format(str(threadId)))
+        taskerLogger.info("TID:{} Checking work for errors".format(str(threadId)))
         threadArray = []
         jobHandlesTemp = []
         tCount = config_checkWorkThreadCount
@@ -230,7 +238,7 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
             if t == tCount - 1:
                 end = len(chunkPaths) - 1
 
-            logging.debug("TID:{} CheckWork() range start/end: {} / {}".format(str(threadId),
+            taskerLogger.debug("TID:{} CheckWork() range start/end: {} / {}".format(str(threadId),
                 str(start), str(end)))
 
             '''
@@ -243,12 +251,12 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
                 target = task.CheckWork, \
                 args = (chunkPaths[start:end], jobHandlesReference[start:end], jobHandlesTemp, t))
 
-            logging.debug("TID:{} Starting CheckWork thread {}".format(str(threadId), str(t)))
+            taskerLogger.debug("TID:{} Starting CheckWork thread {}".format(str(threadId), str(t)))
             thread.start()
             threadArray.append(thread)
 
         ## wait for CheckWork() threads to finish 
-        logging.info("waiting for check threads")
+        taskerLogger.info("waiting for check threads")
         for i, _ in enumerate(threadArray):
             threadArray[i].join()
 
@@ -266,19 +274,19 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
             break
 
 
-    logging.info("TID:{} Building new Matroska file".format(str(threadId)))
+    taskerLogger.info("TID:{} Building new Matroska file".format(str(threadId)))
     noAudioFile = task.RebuildVideo(fullOutboundPath)
 
-    logging.info("TID:{} Merging audio tracks into new MKV file".format(str(threadId)))
+    taskerLogger.info("TID:{} Merging audio tracks into new MKV file".format(str(threadId)))
     finalFileName = task.MergeAudio(noAudioFile, fullOutboundPath)
 
     sleep(1)
-    logging.info("TID:{} Clearing out '.265' chunk files".format(str(threadId)))
+    taskerLogger.info("TID:{} Clearing out '.265' chunk files".format(str(threadId)))
     task.CleanOutFolder(fullOutboundPath, finalFileName)
 
     sleep(1)
     task.IndicateCompleted()
-    logging.info("\nTID:{} Finished {}".format(str(threadId), str(targetFile)))
+    taskerLogger.info("\nTID:{} Finished {}".format(str(threadId), str(targetFile)))
 
 
 
@@ -300,7 +308,7 @@ def main():
     ## check for available workers
     (workerCount, workerList) = getClientCount(redisLink, workerList)
     if workerCount == 0:
-        logging.debug("No workers, sleeping")
+        taskerLogger.debug("No workers, sleeping")
         while getClientCount(redisLink, workerList)[0] == 0:
             sleep(30)
 
@@ -308,7 +316,7 @@ def main():
         ## check for files
         fwReturn = findWork(workQLow, workQHigh, threadKeeper)
         if fwReturn == 0 and len(threadKeeper) == 0:
-            logging.info("No files; UTE sleeping")
+            taskerLogger.info("No files; UTE sleeping")
             while findWork(workQLow, workQHigh, threadKeeper) == 0:
                 sleep(30)
 
@@ -320,24 +328,24 @@ def main():
 
         if highThreads < 2 and len(workQHigh) > 0:
             try:
-                logging.debug("Queing high priority work")
+                taskerLogger.debug("Queing high priority work")
                 targetFile = workQHigh.popleft()
                 targetQueue = rqHigh
                 newThread = True
                 highPriority = True
                 highThreads += 1
             except IndexError:
-                logging.error("Unable to find files in High Queue")
+                taskerLogger.error("Unable to find files in High Queue")
 
         elif lowThreads < 2 and len(workQLow) > 0:
             try:
-                logging.debug("Queing low priority work")
+                taskerLogger.debug("Queing low priority work")
                 targetFile = workQLow.popleft()
                 targetQueue = rqLow
                 newThread = True
                 lowThreads += 1
             except IndexError:
-                logging.error("Unable to find files in Low Queue")
+                taskerLogger.error("Unable to find files in Low Queue")
 
         '''
         if it was determined above that a new thread should be created,
@@ -353,7 +361,7 @@ def main():
                 target = taskManager, \
                 args = (targetQueue, redisLink, targetFile, workerCount, threadId, rqDummy))
 
-            logging.debug("Starting thread")
+            taskerLogger.debug("Starting thread")
             thread.start()
             if highPriority:
                 threadKeeper[(targetFile, 'high')] = thread
@@ -365,7 +373,7 @@ def main():
         if len(threadKeeper) > 0:
             for (name, priority), thread in threadKeeper.items():
                 if not thread.is_alive():
-                    logging.debug("Joining thread " + name)
+                    taskerLogger.debug("Joining thread " + name)
                     thread.join()
                     delThreadItem = (name, priority)
                     if priority == 'high':
@@ -376,7 +384,7 @@ def main():
         if not delThreadItem == None:
             del threadKeeper[delThreadItem]
 
-        #logging.debug("End loop, sleep 10")
+        #taskerLogger.debug("End loop, sleep 10")
         sleep(15)
 
 
