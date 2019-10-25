@@ -15,18 +15,18 @@ inbox = "/ute/inbox"
 outbox = "/ute/outbox"
 doneDir = "done"
 highPriorityDir = "high"
-debug = False
-config_jobTimeout = 600
+logLevel = logging.DEBUG
+config_jobTimeout = 500
 config_cropSampleCount = 13
 config_timeOffsetPercent = 0.15
-config_frameBufferSize = 75
-config_jobSize = 75
+config_frameBufferSize = 100
+config_jobSize = 150
 config_checkWorkThreadCount = 4
 
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 #logging.basicConfig(level=logging.DEBUG)
 rootLogger = logging.getLogger('ute')
-rootLogger.setLevel(logging.DEBUG)
+rootLogger.setLevel(logLevel)
 socketHandler = logging.handlers.SocketHandler('aggregator', 
       logging.handlers.DEFAULT_TCP_LOGGING_PORT)
 
@@ -170,7 +170,7 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
             'inbox' : inbox,
             'outbox' : outbox,
             'target' : targetFile,
-            'debug' : debug,
+            'logLevel' : logLevel,
             'doneDir' : doneDir,
             'jobTimeout' : config_jobTimeout,
             'cropSampleCount' : config_cropSampleCount,

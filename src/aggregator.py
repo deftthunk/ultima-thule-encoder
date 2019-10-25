@@ -75,9 +75,9 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
 
 def main():
     logging.basicConfig(
-        format = '%(relativeCreated)5d %(name)-15s %(levelname)-8s %(message)s')
+        format = '%(name)-12s %(levelname)-7s %(message)s')
     tcpserver = LogRecordSocketReceiver()
-    print('About to start TCP server...')
+    print('Starting TCP server...')
     tcpserver.serve_until_stopped()
 
 if __name__ == '__main__':

@@ -306,33 +306,6 @@ services:
           memory: 3100M
 
 
-  ## worker service with resource values for a different system. service name
-  ## must be different from other worker service.
-  worker-t410:
-    environment:
-      UTE_HOSTNAME: t410
-    depends_on:
-      - redis
-    image: ute:worker
-    volumes:
-      - nfs-in:/ute/inbox
-      - nfs-out:/ute/outbox
-      - x265-vol:/ute/x265
-    networks:
-      ute_net:
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints:
-          - node.labels.name == t410
-      resources:
-        limits:
-          cpus: '4'
-          memory: 4500M
-
-
-
   ## global service (one service instance per swarm host) to build x265 in a
   ## local volume, to be accessed by any local container
   x265-builder:

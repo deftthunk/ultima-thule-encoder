@@ -4,20 +4,24 @@ import re, os
 import logging
 import subprocess
 
+rootLogger = logging.getLogger('ute')
+rootLogger.setLevel(logLevel)
+socketHandler = logging.handlers.SocketHandler('aggregator', 
+      logging.handlers.DEFAULT_TCP_LOGGING_PORT)
 
-#logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-logging.basicConfig(level=logging.DEBUG)
+rootLogger.addHandler(socketHandler)
+workerLogger = logging.getLogger("ute.worker")
+
 
 def encode(cmd):
-    #logging.debug("CMD:: >> " + str(cmd))
-    logging.debug("Starting Popen")
+    workerLogger.debug("Starting Popen")
     status = subprocess.run(cmd, shell=True, stderr=subprocess.STDOUT, \
         stdout=subprocess.PIPE)
 
     #logging.debug("CMD STDOUT:: >> " + str(status.stdout))
-    logging.info("Status: " + str(status.returncode))
+    workerLogger.info("Status: " + str(status.returncode))
     fps = parseFPS(status.stdout)
-    logging.debug("====================================")
+    workerLogger.debug("====================================")
 
     return (fps, hostname(), nodename())
 
@@ -31,7 +35,7 @@ def parseFPS(string):
 
     ## debugging stuff
     #logging.debug("fps output:: >> " + str(string.decode('utf-8')))
-    logging.debug("fps size:: >>" + str(len(fps)))
+    workerLogger.debug("fps size:: >>" + str(len(fps)))
     
     if len(fps) > 0:
         return fps[-1]

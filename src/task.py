@@ -10,7 +10,7 @@ from rq import Queue, Worker
 
 
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 
 
 class Task:
@@ -20,7 +20,7 @@ class Task:
         self.outbox = configDict['outbox']
         self.target = configDict['target']
         self.doneDir = configDict['doneDir']
-        self.debug = configDict['debug']
+        self.logLevel = configDict['logLevel']
         self.jobTimeout = configDict['jobTimeout']
         self.cropSampleCount = configDict['cropSampleCount']
         self.timeOffsetPercent = configDict['timeOffsetPercent']
@@ -29,6 +29,13 @@ class Task:
         self.frameBufferSize = configDict['frameBufferSize']
         self.avgFps = {}
         self.outboundFolderPath = self.MakeOutboundFolderPath()
+
+        #rootLogger = logging.getLogger('ute')
+        #rootLogger.setLevel(self.logLevel)
+        #socketHandler = logging.handlers.SocketHandler('aggregator',
+        #    logging.handlers.DEFAULT_TCP_LOGGING_PORT)
+        #rootLogger.addHandler(socketHandler)
+        self.taskLogger = logging.getLogger("ute.task-" + str(self.threadId))
 
 
     '''
@@ -49,9 +56,8 @@ class Task:
         try:
             os.makedirs(newPath, 0o777, exist_ok=True)
         except(FileNotFoundError) as error:
-            logging.info("TID:{} Unable to create 'outbox' folder or subfolder".format( \
-                str(self.threadId)))
-            logging.error("TID:{} Error: {}".format(str(self.threadId), str(error)))
+            self.taskLogger.info("Unable to create 'outbox' folder or subfolder")
+            self.taskLogger.error("Error: {}".format(str(error)))
             return False
 
         return newPath
@@ -88,7 +94,7 @@ class Task:
         ## using ffprobe. this can end up being the case if the MKV stream is
         ## variable frame rate
         if mediaMatch == None or method == 'ffprobe':
-            logging.info("TID:{} Using ffprobe".format(str(self.threadId)))
+            self.taskLogger.info("Using ffprobe")
             ffprobeRet = subprocess.run(["ffprobe", \
                 "-v", \
                 "error", \
@@ -105,11 +111,10 @@ class Task:
         else:
             frameCount = mediaMatch.group(1)
 
-        logging.info("TID:{} Frame Count: {}".format(str(self.threadId), str(frameCount)))
-        logging.info("TID:{} Frame Rate: {}".format(str(self.threadId), str(frameRate)))
-        logging.info("TID:{} Duration: {}".format(str(self.threadId), str(duration)))
-        logging.info("TID:{} Calc FC: {}".format(str(self.threadId), \
-              str(float(duration) * float(frameRate) / 1000)))
+        self.taskLogger.info("Frame Count: {}".format(str(frameCount)))
+        self.taskLogger.info("Frame Rate: {}".format(str(frameRate)))
+        self.taskLogger.info("Duration: {}".format(str(duration)))
+        self.taskLogger.info("Calc FC: {}".format(str(float(duration) * float(frameRate) / 1000)))
 
         return int(frameCount), float(frameRate), int(duration)
 
@@ -148,27 +153,25 @@ class Task:
         
             if match:
                 cropValues.append(match.group(1))
-                logging.debug("TID:{} Found crop value: {}".format(str(self.threadId), \
-                      match.group(1)))
+                self.taskLogger.debug("Found crop value: {}".format(match.group(1)))
 
         ## parse results
         if len(cropValues) == 0:
-            logging.info("TID:{} No cropping detected".format(str(self.threadId)))
+            self.taskLogger.info("No cropping detected")
             return ''
         elif len(cropValues) < self.cropSampleCount:
-            logging.info("TID:{} Cropping failed to get full sampling!".format(str(self.threadId)))
-            logging.info("TID:{} Proceeding with cropping disabled".format(str(self.threadId)))
+            self.taskLogger.info("Cropping failed to get full sampling!")
+            self.taskLogger.info("Proceeding with cropping disabled")
             return ''
         else:
             try:
                 result = mode(cropValues)
-                logging.info("TID:{} Cropping consensus: {}".format(str(self.threadId), \
-                      str(result)))
+                self.taskLogger.info("Cropping consensus: {}".format(str(result)))
                 return result
             except StatisticsError:
-                logging.info("TID:{} No consensus found for cropping".format(str(self.threadId)))
-                logging.info("TID:{} Try increasing sampling value".format(str(self.threadId)))
-                logging.info("TID:{} Proceeding with cropping disabled".format(str(self.threadId)))
+                self.taskLogger.info("No consensus found for cropping")
+                self.taskLogger.info("Try increasing sampling value")
+                self.taskLogger.info("Proceeding with cropping disabled")
                 return ''
 
 
@@ -202,12 +205,10 @@ class Task:
 
         ## handle two special cases that mess up encoding. Exit if either is true
         if jobSize < frameBufferSize:
-            logging.error("TID:{} ".format(str(self.threadId)) + \
-                  " Error: jobSize must be at least as large as frameBufferSize")
+            self.taskLogger.error("Error: jobSize must be at least as large as frameBufferSize")
             sys.exit()
         if jobCount < 3:
-            logging.error("TID:{} ".format(str(self.threadId)) + \
-                  "Error: jobCount must be higher. Please decrease jobSize")
+            self.taskLogger.error("Error: jobCount must be higher. Please decrease jobSize")
             sys.exit()
 
         ## build the output string for each chunk
@@ -240,7 +241,7 @@ class Task:
                 fileString += ''.join("{:07d}".format(counter))
 
             fileString += "_" + namePart + ".265"
-            #logging.debug("TID:{} FileString: {}".format(str(self.threadId), str(fileString)))
+            #self.taskLogger.debug("FileString: {}".format(str(fileString)))
 
 
         ## determine if cropping will be included
@@ -255,8 +256,7 @@ class Task:
         frames = jobSize + frameBufferSize
         _genFileString()
 
-        logging.debug("TID:{} jobCount / jobSize / frameCountTotal: {}/{}/{}".format( \
-                str(self.threadId), \
+        self.taskLogger.debug("jobCount / jobSize / frameCountTotal: {}/{}/{}".format( \
                 str(jobCount), \
                 str(jobSize), \
                 str(frameCountTotal)))
@@ -305,7 +305,7 @@ class Task:
             ## push built CLI command onto end of list
             encodeTasks.append(' '.join(ffmpegStr.split()))
             ## if debugging, cut out excess spaces from command string
-            #logging.debug(' '.join(ffmpegStr.split()))
+            #self.taskLogger.debug(' '.join(ffmpegStr.split()))
 
             chunkStart = frameBufferSize
             if counter == 0:
@@ -341,9 +341,7 @@ class Task:
             counter += 1
             _genFileString()
 
-        logging.info("TID:{} Encode Tasks: {}".format(str(self.threadId), \
-              str(len(encodeTasks))))
-
+        self.taskLogger.info("Encode Tasks: {}".format(str(len(encodeTasks))))
         return encodeTasks, fileString, chunkPaths
 
 
@@ -386,8 +384,7 @@ class Task:
             else:
                 startIndex = 0
 
-            logging.info("TID:{} Found existing work. Picking up at {}".format(
-                str(self.threadId), str(startIndex)))
+            self.taskLogger.info("Found existing work. Picking up at {}".format(str(startIndex)))
 
         return encodeTasks, encodeTasks[startIndex:]
 
@@ -407,15 +404,12 @@ class Task:
         for task in encodeTasks:
             try:
                 job = q.enqueue('worker.encode', task, job_timeout=self.jobTimeout)
-                #logging.debug("TID:{} Job ID: {}".format(str(self.threadId), \
-                #      str(job.get_id())))
+                #self.taskLogger.debug("Job ID: {}".format(str(job.get_id())))
                 jobHandles.append((job.get_id(), job))
             except:
-                logging.info("TID:{} populateQueue fail: {}".format(str(self.threadId), \
-                      str(task.exc_info)))
+                self.taskLogger.info("PopulateQueue fail: {}".format(str(task.exc_info)))
      
-        logging.info("TID:{} Jobs queued: {}".format(str(self.threadId), \
-              str(len(jobHandles))))
+        self.taskLogger.info("Jobs queued: {}".format(str(len(jobHandles))))
         return q, jobHandles
 
 
@@ -474,8 +468,7 @@ class Task:
                         fpsAverage = ret
 
                     ## build status progress string
-                    out = "TID:{} | {}/{} - FPS/Total: {} / {} \t<{}> || {}".format( \
-                            str(self.threadId), \
+                    out = "{}/{} - FPS/Total: {} / {} \t<{}> || {}".format( \
                             str(counter), \
                             str(jobNum), \
                             str(fps), \
@@ -483,7 +476,7 @@ class Task:
                             str(hostname), \
                             str(jobId))
 
-                    logging.info(out)
+                    self.taskLogger.info(out)
 
                     ## store index of completed job for removal
                     deleteIndex = i
@@ -513,8 +506,7 @@ class Task:
                     catch cases where the job status is not 'finished' or 'failed', and 
                     log info about this job and context
                     '''
-                    logging.debug("TID:{} Unknown Job Status: {} - jobId: {}".format( \
-                          str(self.threadId),
+                    self.taskLogger.debug("Unknown Job Status: {} - jobId: {}".format( \
                           str(job.get_status()),
                           str(jobId)))
 
@@ -526,8 +518,7 @@ class Task:
                 sleep(0.5)
 
 
-            #logging.debug("TID:{} jobList Size: {}".format(str(self.threadId), \
-            #       str(len(jobList))))
+            #self.taskLogger.debug("jobList Size: {}".format(str(len(jobList))))
             if len(jobList) == 0:
                 break
             elif deleteIndex != None:
@@ -554,10 +545,10 @@ class Task:
         '''
         import pprint
 
-        logging.info("TID:{} Requeing job {}".format(str(self.threadId), str(jobId)))
+        self.taskLogger.info("Requeing job {}".format(str(jobId)))
         pp = pprint.PrettyPrinter()
         ppArgsParam = pp.pformat(argsParam)
-        logging.info("TID:{} args: {}".format(str(self.threadId), str(ppArgsParam)))
+        self.taskLogger.info("args: {}".format(str(ppArgsParam)))
 
         newJob = q.enqueue_call('worker.encode', args=argsParam, \
                 timeout=self.jobTimeout, job_id=jobId, at_front=True)
@@ -632,33 +623,31 @@ class Task:
                             frameCountExpected = int(chunkEnd.group(1)) - 1  ## off by one
                         except AttributeError as error:
                             missing = True
-                            logging.warning("TID:{} chunkStart, chunkEnd missing! :: {}".format(
-                                str(self.threadId), str(error)))
-                            logging.warning("TID:{} chunk: ".format(str(self.threadId), str(path)))
-                            logging.warning("TID:{} flagging chunk for requeue".format( \
-                                str(self.threadId)))
-                            logging.debug("data : " + str(data.stdout.decode('utf-8')))
+                            self.taskLogger.warning("chunkStart, chunkEnd missing! :: {}".format(
+                                str(error)))
+                            self.taskLogger.warning("chunk: {}".format(str(path)))
+                            self.taskLogger.warning("flagging chunk for requeue")
+                            self.taskLogger.debug("data : " + str(data.stdout.decode('utf-8')))
                     elif chunkEnd == None:
                         try:
                             frameCountExpected = int(totalFrames) - int(chunkStart.group(1))
-                            logging.debug("total-frames: " + str(totalFrames))
-                            logging.debug("chunk: " + str(path))
+                            self.taskLogger.debug("total-frames: " + str(totalFrames))
+                            self.taskLogger.debug("chunk: " + str(path))
                         except AttributeError as error:
                             missing = True
-                            logging.error("TID:{} chunkStart, chunkEnd missing! Error: {}".format(
-                                str(self.threadId), str(error)))
-                            logging.error("chunk: " + str(path))
+                            self.taskLogger.error("chunkStart, chunkEnd missing! Error: {}".format(
+                                str(error)))
+                            self.taskLogger.error("chunk: " + str(path))
                     else:
-                        #logging.debug("chunkStart: " + chunkStart.group(1))
-                        #logging.debug("chunkEnd: " + chunkEnd.group(1))
+                        #self.taskLogger.debug("chunkStart: " + chunkStart.group(1))
+                        #self.taskLogger.debug("chunkEnd: " + chunkEnd.group(1))
                         frameCountExpected = int(chunkEnd.group(1)) - int(chunkStart.group(1))
 
-                    logging.debug("TID:{} FramesFound: {} FramesExpected: {} :: {}".format( \
-                        str(self.threadId), str(frameCountFound), str(frameCountExpected), \
-                        str(path)))
+                    self.taskLogger.debug("FramesFound: {} FramesExpected: {} :: {}".format(
+                        str(frameCountFound), str(frameCountExpected), str(path)))
             except FileNotFoundError:
                 ## exception handling in desperate need of reworking
-                logging.info("TID:{} Missing chunk {}".format(str(self.threadId), str(chunk)))
+                self.taskLogger.info("Missing chunk {}".format(str(chunk)))
                 missing = True
 
 
@@ -669,7 +658,7 @@ class Task:
             '''
             #if  missing or fSize < 10 * 1024:
             if missing or (int(frameCountExpected) != int(frameCountFound)):
-                logging.info("TID:{} Found failed job {}".format(str(self.threadId), str(chunk)))
+                self.taskLogger.info("Found failed job {}".format(str(chunk)))
                 chunkName = chunk.split('/')[1]
                 chunkNumber = re.match('^(\d{3,7})_.*\.265', chunkName)
                 offender = jobHandles[int(chunkNumber.group(1))]
@@ -711,8 +700,7 @@ class Task:
             firstFlag = 1
 
         cmdString = ' '.join(cmd)
-        #logging.debug("TID:{} rebuildVideo() cmd: {}".format(str(self.threadId), \
-        #    str(cmdString)))
+        #self.taskLogger.debug("rebuildVideo() cmd: {}".format(str(cmdString)))
         os.system(cmdString)
 
         return noAudioFilePath
@@ -736,8 +724,7 @@ class Task:
                 r'"{}"'.format(noAudioFile)]
 
         cmdString = ' '.join(cmd)
-        #logging.debug("TID:{} mergeAudio() cmd: {}".format(str(self.threadId), \
-        #      str(cmdString)))
+        #self.taskLogger.debug("mergeAudio() cmd: {}".format(str(cmdString)))
         os.system(cmdString)
 
         return finalFileName
@@ -750,8 +737,7 @@ class Task:
     def CleanOutFolder(self, fullOutboundPath, finalFileName):
         video = Path(finalFileName)
         if not video.is_file():
-            logging.error("TID:{} ".format(str(self.threadId)) + \
-                "Cannot find completed video file. Delaying cleaning")
+            self.taskLogger.error("Cannot find completed video file. Delaying cleaning")
         else:
             dirFiles = os.listdir(fullOutboundPath)
             for entry in dirFiles:
@@ -771,8 +757,7 @@ class Task:
 
         ## move source file to 'done' folder in inbox
         moveTargetPath = '/'.join([doneFolder, self._getFileName(self.target)])
-        logging.debug("TID:{} file move: {}".format(str(self.threadId), \
-              str(moveTargetPath)))
+        self.taskLogger.debug("file move: {}".format(str(moveTargetPath)))
         shutil.move(self.target, moveTargetPath)
 
 
