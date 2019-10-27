@@ -9,12 +9,16 @@ RUN apt-get update && \
                 python3-dev \
 		mediainfo \
                 mkvtoolnix \
-		vim \ 
+                locales-all \
 		ffmpeg && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/* && \
   useradd -ms /bin/bash utbot && \
   ldconfig
+
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
 
 ## become user 'utbot', change working dir, install RQ
 USER utbot
