@@ -277,7 +277,7 @@ services:
       resources:
         limits:
           cpus: '5'
-          memory: 5700M
+          memory: 4000M
 
 
   ## worker service with resource values for a different system. service name
@@ -303,7 +303,7 @@ services:
       resources:
         limits:
           cpus: '4'
-          memory: 3100M
+          memory: 3000M
 
 
   ## global service (one service instance per swarm host) to build x265 in a

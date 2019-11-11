@@ -27,14 +27,9 @@ class Task:
         self.task_workers = configDict['workers']
         self.jobSize = configDict['jobSize']
         self.frameBufferSize = configDict['frameBufferSize']
+
         self.avgFps = {}
         self.outboundFolderPath = self.MakeOutboundFolderPath()
-
-        #rootLogger = logging.getLogger('ute')
-        #rootLogger.setLevel(self.logLevel)
-        #socketHandler = logging.handlers.SocketHandler('aggregator',
-        #    logging.handlers.DEFAULT_TCP_LOGGING_PORT)
-        #rootLogger.addHandler(socketHandler)
         self.taskLogger = logging.getLogger("ute.task-" + str(self.threadId))
 
 
@@ -281,7 +276,7 @@ class Task:
                     --colorprim bt709 \
                     --transfer bt709 \
                     --colormatrix bt709 \
-                    --crf=19 \
+                    --crf=18 \
                     --fps {frt} \
                     --min-keyint 24 \
                     --keyint 240 \
@@ -515,7 +510,7 @@ class Task:
                     break
 
                 ## pause before polling RQ again
-                sleep(0.5)
+                sleep(0.1)
 
 
             #self.taskLogger.debug("jobList Size: {}".format(str(len(jobList))))
