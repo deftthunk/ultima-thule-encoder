@@ -27,7 +27,10 @@ def encode(cmd):
     workerLogger.debug("====================================")
     workerLogger.debug("fps: " + str(fps))
 
+    ## give container a chance to write everything out to network drive. otherwise
+    ## it can give RQ problems and hang
     flush = subprocess.run('sync', shell=True)
+    sleep(2)
 
     return (fps, host, node)
 

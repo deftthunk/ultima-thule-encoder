@@ -7,6 +7,7 @@
 - detect when a worker goes down, and requeue their work. otherwise the job hanges indefinitely
 - coastdown/shutdown
 - python TUI
+- add multi-threading to FindWork() to parallelize checks for ongoing file transfers
 
 
 BUGS:

@@ -644,7 +644,7 @@ class Task:
                         #self.taskLogger.debug("chunkEnd: " + chunkEnd.group(1))
                         frameCountExpected = int(chunkEnd.group(1)) - int(chunkStart.group(1))
 
-                    self.taskLogger.debug("FramesFound: {} FramesExpected: {} :: {}".format(
+                    self.taskLogger.debug("Frames Found/Expected: {}/{} :: {}".format(
                         str(frameCountFound), str(frameCountExpected), str(path)))
             except FileNotFoundError:
                 ## exception handling in desperate need of reworking
@@ -708,18 +708,21 @@ class Task:
 
 
     '''
-    tbd
+    use mkvmerge to recombine the newly merged video track with the original audio track
+    from the source.
     '''
     def MergeAudio(self, noAudioFile, fullOutboundPath):
         quiet = None
         finalFileName = '/'.join([fullOutboundPath, self._getFileName(self.target)])
+        ## append a status indicator so users know the file is still being built
+        tempFileName = finalFileName + '.processing'
         if self.logLevel == logging.DEBUG:
             quiet = ''
         else:
             quiet = '--quiet'
 
         cmd = ['mkvmerge', quiet, '--output', \
-                r'"{}"'.format(finalFileName), \
+                r'"{}"'.format(tempFileName), \
                 '-D', \
                 r'"{}"'.format(self.target), \
                 r'"{}"'.format(noAudioFile)]
@@ -727,6 +730,9 @@ class Task:
         cmdString = ' '.join(cmd)
         self.taskLogger.debug("mergeAudio() cmd: {}".format(str(cmdString)))
         os.system(cmdString)
+
+        ## remove status indicator from filename
+        os.rename(tempFileName, finalFileName)
 
         return finalFileName
 

@@ -16,7 +16,7 @@ outbox = "/ute/outbox"
 doneDir = "done"
 highPriorityDir = "high"
 logLevel = logging.DEBUG
-config_jobTimeout = 360
+config_jobTimeout = 300
 config_cropSampleCount = 13
 config_timeOffsetPercent = 0.15
 config_frameBufferSize = 100
@@ -109,6 +109,7 @@ def findWork(workQLow, workQHigh, threadKeeper):
             if size2 == size1:
                 readyList.append(f)
 
+        readyList.sort()
         taskerLogger.info("{} of {} files ready for queuing".format(
               str(len(readyList)), str(len(files))))
         return readyList
@@ -119,7 +120,7 @@ def findWork(workQLow, workQHigh, threadKeeper):
     '''
     if lowIntersect == set() and len(newLowFiles) > 0:
         taskerLogger.info("Low Priority file(s) found: " + str(len(newLowFiles)))
-        taskerLogger.debug("Low set intersection " + str(set(newLowFiles).intersection(activeFilesLow)))
+        #taskerLogger.debug("Low set intersection " + str(set(newLowFiles).intersection(activeFilesLow)))
         newLowFiles = checkFileTransferProgress(newLowFiles)
         workQLow.extend([entry for entry in newLowFiles])
         totalNewFiles += len(newLowFiles)
@@ -127,7 +128,7 @@ def findWork(workQLow, workQHigh, threadKeeper):
 
     if highIntersect == set() and len(newHighFiles) > 0:
         taskerLogger.info("High Priority file(s) found: " + str(len(newHighFiles)))
-        taskerLogger.debug("High set intersection " + str(set(newHighFiles).intersection(activeFilesHigh)))
+        #taskerLogger.debug("High set intersection " + str(set(newHighFiles).intersection(activeFilesHigh)))
         newHighFiles = checkFileTransferProgress(newHighFiles)
         workQHigh.extend([entry for entry in newHighFiles])
         totalNewFiles += len(newHighFiles)

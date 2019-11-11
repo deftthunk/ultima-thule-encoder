@@ -224,7 +224,7 @@ services:
           - node.labels.name == kvm
       resources:
         limits:
-          cpus: '4'
+          cpus: '6'
           memory: 4000M
 
 
