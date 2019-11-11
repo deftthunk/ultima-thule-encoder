@@ -276,7 +276,7 @@ class Task:
                     --colorprim bt709 \
                     --transfer bt709 \
                     --colormatrix bt709 \
-                    --crf=18 \
+                    --crf=19 \
                     --fps {frt} \
                     --min-keyint 24 \
                     --keyint 240 \
@@ -678,7 +678,7 @@ class Task:
         dirFiles.sort()
         tempFileName = '_'.join(['noaudio', self._getFileName(self.target)])
         noAudioFilePath = '/'.join([fullOutboundPath, tempFileName])
-        if self.debug:
+        if self.logLevel == logging.DEBUG:
             quiet = ''
         else:
             quiet = '--quiet'
@@ -695,7 +695,7 @@ class Task:
             firstFlag = 1
 
         cmdString = ' '.join(cmd)
-        #self.taskLogger.debug("rebuildVideo() cmd: {}".format(str(cmdString)))
+        self.taskLogger.debug("rebuildVideo() cmd: {}".format(str(cmdString)))
         os.system(cmdString)
 
         return noAudioFilePath
@@ -707,7 +707,7 @@ class Task:
     def MergeAudio(self, noAudioFile, fullOutboundPath):
         quiet = None
         finalFileName = '/'.join([fullOutboundPath, self._getFileName(self.target)])
-        if self.debug:
+        if self.logLevel == logging.DEBUG:
             quiet = ''
         else:
             quiet = '--quiet'
@@ -719,7 +719,7 @@ class Task:
                 r'"{}"'.format(noAudioFile)]
 
         cmdString = ' '.join(cmd)
-        #self.taskLogger.debug("mergeAudio() cmd: {}".format(str(cmdString)))
+        self.taskLogger.debug("mergeAudio() cmd: {}".format(str(cmdString)))
         os.system(cmdString)
 
         return finalFileName

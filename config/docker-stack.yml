@@ -140,14 +140,14 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 4
+      replicas: 3
       placement:
         constraints:
           - node.labels.name == smaug
       resources:
         limits:
           cpus: '8.0'
-          memory: 3000M
+          memory: 4000M
 
 
   ## worker service with resource values for a different system. service name
@@ -166,7 +166,7 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 1
+      replicas: 0
       placement:
         constraints:
           - node.labels.name == nuc
@@ -199,7 +199,7 @@ services:
       resources:
         limits:
           cpus: '10'
-          memory: 4000M
+          memory: 3700M
 
 
   ## worker service with resource values for a different system. service name
@@ -218,14 +218,14 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 1
       placement:
         constraints:
           - node.labels.name == kvm
       resources:
         limits:
           cpus: '4'
-          memory: 3000M
+          memory: 4000M
 
 
   ## worker service with resource values for a different system. service name
