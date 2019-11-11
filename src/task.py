@@ -499,11 +499,17 @@ class Task:
                 elif job.get_status() != "queued" and job.get_status() != "started":
                     '''
                     catch cases where the job status is not 'finished' or 'failed', and 
-                    log info about this job and context
+                    log info about this job and context. then attempt to pass the job off
+                    as complete and let the error checking figure it out later.
                     '''
                     self.taskLogger.debug("Unknown Job Status: {} - jobId: {}".format( \
                           str(job.get_status()),
                           str(jobId)))
+
+                    ## store index of completed job for removal
+                    deleteIndex = i
+                    counter += 1
+
 
                 ## if index is larger than the size of our (shrinking) list, break
                 if i > pollSize:

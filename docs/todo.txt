@@ -12,8 +12,8 @@
 BUGS:
 - only one high task gets queued at a time
 - if checkForWork() finds existing work, the generated array of work will be
-	passed onto checkForErrors() in its truncated form, and UTE will only look at the first
-	'x' amount of chunks
+	passed onto checkForErrors() in its truncated form, and UTE will only look at the first 'x' amount of chunks
+- sort files so behaviour is consistent between runs
 - if a worker is added while UTE is processing, it seems not all workers in teh swarm stay active?
 - COMPLETED|: requeuing failed jobs sends them to back of queue
 - COMPLETED|: starts encoding file while file still transfering to inbox
