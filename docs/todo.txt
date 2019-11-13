@@ -2,12 +2,13 @@
 - figure out windows madness
 - dynamically add/remove workers to/from swarm
 - logging
-- config
+- config: enable per-file config for crop settings
 - watchdog (dynamically change timeout, restart failed workers, finish failed tasks)
 - detect when a worker goes down, and requeue their work. otherwise the job hanges indefinitely
 - coastdown/shutdown
 - python TUI
 - add multi-threading to FindWork() to parallelize checks for ongoing file transfers
+- simple folders for pre/post processing plugins. plugins can take the form of python or bash. provide a simple api or library?  plugins get run in the order of their name "01_plugin.sh"
 
 
 BUGS:

@@ -17,11 +17,12 @@ doneDir = "done"
 highPriorityDir = "high"
 logLevel = logging.DEBUG
 config_jobTimeout = 300
-config_cropSampleCount = 13
+config_cropSampleCount = 17
 config_timeOffsetPercent = 0.15
 config_frameBufferSize = 100
 config_jobSize = 150
-config_checkWorkThreadCount = 4
+config_checkWorkThreadCount = 5
+config_findWorkThreadCountMax = 10
 
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 #logging.basicConfig(level=logging.DEBUG)
@@ -96,23 +97,59 @@ def findWork(workQLow, workQHigh, threadKeeper):
 
     '''
     detect when a file is still in the process of being copied into the inbox.
-    if so, ignore the file and we'll evaluate it again on the next pass through.
+    if so, ignore the file and we'll evaluate it again on the next pass.
     '''
     def checkFileTransferProgress(files):
         readyList = []
+        threadArray = []
+        sleepDuration = 3
 
-        for f in files:
+        ## preallocate array so that we can access 
+        for i in range(len(files)):
+            readyList.append(i)
+
+
+        ## file size delta function, defined to be made easy for multi-threading
+        def watchFileSize(filePath, index):
             size1 = os.stat(f).st_size
-            sleep(2)
+            sleep(sleepDuration)
             size2 = os.stat(f).st_size
-            
-            if size2 == size1:
-                readyList.append(f)
 
-        readyList.sort()
+            if size2 == size1:
+                readyList[index] = filePath
+
+
+        '''
+        to speed up checking if each file is changing size, we parallelize the process
+        with threads. this is all I/O waiting, so we can have more threads than our
+        CPU may support. default max is 30. if we hit max, we wait the allotted time 
+        that the watchFileSize() function is waiting, which should mostly expire the
+        existing threads.
+
+        results are placed in a pre-allocated index in readyList
+        for i, f in enumerate(files):
+            thread = threading.Thread(target = watchFileSize, args = (f, i))
+            thread.start()
+            threadArray.append(thread)
+
+            if (i % config_findWorkThreadCountMax == 0) and (i > 0):
+                sleep(sleepDuration)
+
+
+        ## join watchFileSize() threads
+        sleep(sleepDuration)
+        for i, _ in enumerate(threadArray):
+            threadArray[i].join()
+        '''
+
+        for i, f in enumerate(files):
+            watchFileSize(f, i)
+
+        finalList = [i for i in readyList if type(i) == str]
+        finalList.sort()
         taskerLogger.info("{} of {} files ready for queuing".format(
-              str(len(readyList)), str(len(files))))
-        return readyList
+              str(len(finalList)), str(len(files))))
+        return finalList
 
 
     '''
@@ -335,6 +372,14 @@ def main():
                 newThread = True
                 highPriority = True
                 highThreads += 1
+
+                '''
+                if there's already a thread, delay creation of a second thread to
+                avoid interleaving thread2 jobs with thread1 jobs, since it takes
+                a few seconds to push jobs to Redis
+                '''
+                if highThreads == 1:
+                    sleep(30)
             except IndexError:
                 taskerLogger.error("Unable to find files in High Queue")
 
@@ -345,6 +390,14 @@ def main():
                 targetQueue = rqLow
                 newThread = True
                 lowThreads += 1
+
+                '''
+                if there's already a thread, delay creation of a second thread to
+                avoid interleaving thread2 jobs with thread1 jobs, since it takes
+                a few seconds to push jobs to Redis
+                '''
+                if lowThreads == 1:
+                    sleep(10)
             except IndexError:
                 taskerLogger.error("Unable to find files in Low Queue")
 
