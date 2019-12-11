@@ -13,6 +13,7 @@
 
 BUGS:
 - only one high task gets queued at a time
+- if checkForWork() finds existing work, it assumes the missing chunks are all at the end of the file (if the user or a process deleted or failed to make a chunk somewhere else, it will be glossed over)
 - if checkForWork() finds existing work, the generated array of work will be
 	passed onto checkForErrors() in its truncated form, and UTE will only look at the first 'x' amount of chunks
 - sort files so behaviour is consistent between runs

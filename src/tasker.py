@@ -16,13 +16,13 @@ outbox = "/ute/outbox"
 doneDir = "done"
 highPriorityDir = "high"
 logLevel = logging.DEBUG
-config_jobTimeout = 300
+config_jobTimeout = 200
 config_cropSampleCount = 17
 config_timeOffsetPercent = 0.15
 config_frameBufferSize = 100
 config_jobSize = 150
-config_checkWorkThreadCount = 5
-config_findWorkThreadCountMax = 10
+config_checkWorkThreadCount = 3
+config_findWorkThreadCountMax = 4
 
 #logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
 #logging.basicConfig(level=logging.DEBUG)
@@ -257,6 +257,7 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
         threadArray = []
         jobHandlesTemp = []
         tCount = config_checkWorkThreadCount
+        ## how many chunks per CheckWork() thread
         checkSize = int(len(chunkPaths) / tCount)
 
         '''
@@ -276,6 +277,12 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
             if t == tCount - 1:
                 end = len(chunkPaths) - 1
 
+            ## temp debugging DELETE ME
+            taskerLogger.debug("t {} - start/end: {}/{}".format(str(t), str(start), str(end)))
+            taskerLogger.debug("t {} - jobHandlesReference len {} ".format(str(t), str(len(jobHandlesReference))))
+            taskerLogger.debug("t {} - jobHandlesReference[s:e] len {}".format(str(t), str(len(jobHandlesReference[start:end]))))
+
+
             taskerLogger.debug("TID:{} CheckWork() range start/end: {} / {}".format(str(threadId),
                 str(start), str(end)))
 
@@ -287,27 +294,37 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
             '''
             thread = threading.Thread( \
                 target = task.CheckWork, \
-                args = (chunkPaths[start:end], jobHandlesReference[start:end], jobHandlesTemp, t))
+                args = (chunkPaths[start:end], jobHandlesReference, jobHandlesTemp, t))
+#                args = (chunkPaths[start:end], jobHandlesReference[start:end], jobHandlesTemp, t))
 
             taskerLogger.debug("TID:{} Starting CheckWork thread {}".format(str(threadId), str(t)))
             thread.start()
             threadArray.append(thread)
 
+
         ## wait for CheckWork() threads to finish 
         taskerLogger.info("waiting for check threads")
         for i, _ in enumerate(threadArray):
             threadArray[i].join()
+            taskerLogger.debug("TID:{} CheckWork thread {} returned".format(str(threadId), str(i)))
 
         ## combine the failed chunks of all CheckWork() threads into jobHandles[]
         jobHandles = []
+        debugCtr = 0
         for array in jobHandlesTemp:
             jobHandles += array
+            taskerLogger.debug("TID:{} CheckWork thread {} length: {}".format(str(threadId), 
+                str(i), len(array)))
+            debugCtr += 1
 
-        #jobHandles = task.CheckWork(chunkPaths, jobHandlesReference)
-
+        ## if we have failed jobs, requeue them
+        ## jobHandles is an array of tuples
         if len(jobHandles) > 0:
             for jobId, job in jobHandles:
                 task.RequeueJob(job.args, q, jobId)
+                taskerLogger.debug("TID:{} Requeuing {}".format(str(threadId), str(jobId)))
+
+            taskerLogger.info("TID:{} Waiting for requeued jobs to complete".format(str(threadId)))
         else:
             break
 

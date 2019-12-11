@@ -30,7 +30,7 @@ def encode(cmd):
     ## give container a chance to write everything out to network drive. otherwise
     ## it can give RQ problems and hang
     flush = os.system('sync')
-    sleep(2)
+    sleep(0.5)
 
     return (fps, host, node)
 

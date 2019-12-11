@@ -276,7 +276,7 @@ class Task:
                     --colorprim bt709 \
                     --transfer bt709 \
                     --colormatrix bt709 \
-                    --crf=19 \
+                    --crf=17 \
                     --fps {frt} \
                     --min-keyint 24 \
                     --keyint 240 \
@@ -375,7 +375,7 @@ class Task:
             If very little work was done, then forget it and just restart at 0.
             '''
             if startIndex > numOfWorkers * 3:
-                startIndex -= numOfWorkers * 1
+                startIndex -= numOfWorkers * 3
             else:
                 startIndex = 0
 
@@ -657,12 +657,15 @@ class Task:
             correct index of the tuple (job_id, job) in jobHandles. push
             the tuple to redoJobs for reprocessing
             '''
-            #if  missing or fSize < 10 * 1024:
             if missing or (int(frameCountExpected) != int(frameCountFound)):
                 self.taskLogger.info("Found failed job {}".format(str(chunk)))
                 chunkName = chunk.split('/')[1]
+                self.taskLogger.debug("chunkName: " + str(chunkName))
                 chunkNumber = re.match('^(\d{3,7})_.*\.265', chunkName)
+                self.taskLogger.debug("chunkNumber: " + str(chunkNumber.group(1)))
+                self.taskLogger.debug("jobHandles len: " + str(len(jobHandles)))
                 offender = jobHandles[int(chunkNumber.group(1))]
+                self.taskLogger.debug("offender: " + str(offender))
                 redoJobs.append(offender)
 
 

@@ -140,7 +140,7 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 3
+      replicas: 0
       placement:
         constraints:
           - node.labels.name == smaug
@@ -192,7 +192,7 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 1
+      replicas: 0
       placement:
         constraints:
           - node.labels.name == esx
@@ -270,14 +270,14 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 2
       placement:
         constraints:
           - node.labels.name == motoko
       resources:
         limits:
-          cpus: '5'
-          memory: 4000M
+          cpus: '7'
+          memory: 6000M
 
 
   ## worker service with resource values for a different system. service name
@@ -343,16 +343,16 @@ volumes:
     driver: local
     driver_opts:
       type: nfs
-#      o: addr=10.41.0.109,rw,nolock,noresvport
-      o: addr=10.168.1.111,rw,nolock,noresvport
-#      device: ":/volume1/ute/inbox"
-      device: ":/mnt/user/work/ute/inbox"
+      o: addr=10.41.0.109,rw,cto,sync,nolock,noresvport
+#      o: addr=10.168.1.111,rw,cto,nolock,noresvport
+      device: ":/volume1/ute/inbox"
+#      device: ":/mnt/user/work/ute/inbox"
  
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-#      o: addr=10.41.0.109,rw,nolock,noresvport
-      o: addr=10.168.1.111,rw,nolock,noresvport
-#      device: ":/volume1/ute/outbox"
-      device: ":/mnt/user/work/ute/outbox"
+      o: addr=10.41.0.109,rw,cto,sync,nolock,noresvport
+#      o: addr=10.168.1.111,rw,cto,nolock,noresvport
+      device: ":/volume1/ute/outbox"
+#      device: ":/mnt/user/work/ute/outbox"
