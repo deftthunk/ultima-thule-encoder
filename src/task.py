@@ -9,10 +9,6 @@ from redis import Redis
 from rq import Queue, Worker
 
 
-#logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-#logging.basicConfig(level=logging.DEBUG)
-
-
 class Task:
     def __init__(self, configDict):
         self.threadId = configDict['threadId']
@@ -68,12 +64,12 @@ class Task:
 
         if method == 'default' or method == 'mediainfo':
             ## attempting mediainfo method
-            mediaRet = subprocess.run(["mediainfo", "--fullscan", self.target], \
+            mediaRet = subprocess.run(["mediainfo", "--fullscan", self.target], 
                     stdout=subprocess.PIPE)
             mediaMatch = re.search('Frame count.*?(\d+)', mediaRet.stdout.decode('utf-8'))
-            mediaFrameRate = re.search('Frame rate.*?(\d\d\d?)(\.\d\d?\d?)?', \
+            mediaFrameRate = re.search('Frame rate.*?(\d\d\d?)(\.\d\d?\d?)?', 
                     mediaRet.stdout.decode('utf-8'))
-            mediaDuration = re.search('Duration.*?\s(\d{2,})\s*\n', \
+            mediaDuration = re.search('Duration.*?\s(\d{2,})\s*\n', 
                     mediaRet.stdout.decode('utf-8'))
 
         ## get frame rate
@@ -90,16 +86,16 @@ class Task:
         ## variable frame rate
         if mediaMatch == None or method == 'ffprobe':
             self.taskLogger.info("Using ffprobe")
-            ffprobeRet = subprocess.run(["ffprobe", \
-                "-v", \
-                "error", \
-                "-count_frames", \
-                "-select_streams", \
-                "v:0", \
-                "-show_entries", \
-                "stream=nb_read_frames", \
-                "-of", \
-                "default=nokey=1:noprint_wrappers=1", \
+            ffprobeRet = subprocess.run(["ffprobe", 
+                "-v", 
+                "error", 
+                "-count_frames", 
+                "-select_streams", 
+                "v:0", 
+                "-show_entries", 
+                "stream=nb_read_frames", 
+                "-of", 
+                "default=nokey=1:noprint_wrappers=1", 
                 self.target], stdout=subprocess.PIPE)
 
             frameCount = ffprobeRet.stdout.decode('utf-8')
@@ -134,16 +130,16 @@ class Task:
 
         ## sampling loop
         for offset in offsets:
-            cmdRet = subprocess.run(["ffmpeg", \
-                            "-ss", str(offset), \
-                            "-i", self.target, \
-                            "-t", "10", \
-                            "-vf", "cropdetect=24:16:0", \
-                            "-preset", "ultrafast", \
-                            "-f", "null", \
-                            "-"], \
+            cmdRet = subprocess.run(["ffmpeg", 
+                            "-ss", str(offset), 
+                            "-i", self.target, 
+                            "-t", "10", 
+                            "-vf", "cropdetect=24:16:0", 
+                            "-preset", "ultrafast", 
+                            "-f", "null", 
+                            "-"], 
                         stderr=subprocess.STDOUT, stdout=subprocess.PIPE)
-            match = re.search(r'\s(crop=\d+\:\d+[^a-zA-Z]*?)\n', \
+            match = re.search(r'\s(crop=\d+\:\d+[^a-zA-Z]*?)\n', 
                 cmdRet.stdout.decode('utf-8'))
         
             if match:
@@ -251,9 +247,9 @@ class Task:
         frames = jobSize + frameBufferSize
         _genFileString()
 
-        self.taskLogger.debug("jobCount / jobSize / frameCountTotal: {}/{}/{}".format( \
-                str(jobCount), \
-                str(jobSize), \
+        self.taskLogger.debug("jobCount / jobSize / frameCountTotal: {}/{}/{}".format( 
+                str(jobCount), 
+                str(jobSize), 
                 str(frameCountTotal)))
 
         ## ffmpeg and x265 CLI args, with placeholder variables defined in the 
@@ -285,16 +281,16 @@ class Task:
                     --ctu 64 \
                     --y4m \
                     --pools \"+\" \
-                    -o '{dst}/{fStr}'".format( \
-                    tr = self.target, \
-                    cd = crop, \
-                    fr = frames, \
-                    cs = chunkStart, \
-                    ce = chunkEnd, \
-                    ctr = counter, \
-                    frt = frameRate, \
-                    sec = seconds, \
-                    dst = self.outbox, \
+                    -o '{dst}/{fStr}'".format( 
+                    tr = self.target, 
+                    cd = crop, 
+                    fr = frames, 
+                    cs = chunkStart, 
+                    ce = chunkEnd, 
+                    ctr = counter, 
+                    frt = frameRate, 
+                    sec = seconds, 
+                    dst = self.outbox, 
                     fStr = fileString)
 
             ## push built CLI command onto end of list
@@ -399,7 +395,6 @@ class Task:
         for task in encodeTasks:
             try:
                 job = q.enqueue('worker.encode', task, job_timeout=self.jobTimeout)
-                #self.taskLogger.debug("Job ID: {}".format(str(job.get_id())))
                 jobHandles.append((job.get_id(), job))
             except:
                 self.taskLogger.info("PopulateQueue fail: {}".format(str(task.exc_info)))
@@ -463,12 +458,12 @@ class Task:
                         fpsAverage = ret
 
                     ## build status progress string
-                    out = "{}/{} - FPS/Total: {} / {} \t<{}> || {}".format( \
-                            str(counter), \
-                            str(jobNum), \
-                            str(fps), \
-                            "{0:.2f}".format(fpsAverage), \
-                            str(hostname), \
+                    out = "{}/{} - FPS/Total: {}/{}\t<{}> | {}".format( 
+                            str(counter), 
+                            str(jobNum), 
+                            str(fps), 
+                            "{0:.2f}".format(fpsAverage), 
+                            str(hostname), 
                             str(jobId))
 
                     self.taskLogger.info(out)
@@ -502,7 +497,7 @@ class Task:
                     log info about this job and context. then attempt to pass the job off
                     as complete and let the error checking figure it out later.
                     '''
-                    self.taskLogger.debug("Unknown Job Status: {} - jobId: {}".format( \
+                    self.taskLogger.debug("Unknown Job Status: {} - jobId: {}".format( 
                           str(job.get_status()),
                           str(jobId)))
 
@@ -551,7 +546,7 @@ class Task:
         ppArgsParam = pp.pformat(argsParam)
         self.taskLogger.info("args: {}".format(str(ppArgsParam)))
 
-        newJob = q.enqueue_call('worker.encode', args=argsParam, \
+        newJob = q.enqueue_call('worker.encode', args=argsParam, 
                 timeout=self.jobTimeout, job_id=jobId, at_front=True)
 
         return newJob
@@ -594,18 +589,17 @@ class Task:
                 fSize = os.path.getsize('/'.join([folder, chunk]))
                 if fSize < 4 * 1024:
                     missing = True
-                #elif fSize < 500 * 1024:
                 else:
-                    ffprobeRet = subprocess.run(["ffprobe", \
-                        "-v", \
-                        "error", \
-                        "-count_frames", \
-                        "-select_streams", \
-                        "v:0", \
-                        "-show_entries", \
-                        "stream=nb_read_frames", \
-                        "-of", \
-                        "default=nokey=1:noprint_wrappers=1", \
+                    ffprobeRet = subprocess.run(["ffprobe", 
+                        "-v", 
+                        "error", 
+                        "-count_frames", 
+                        "-select_streams", 
+                        "v:0", 
+                        "-show_entries", 
+                        "stream=nb_read_frames", 
+                        "-of", 
+                        "default=nokey=1:noprint_wrappers=1", 
                         path], stdout=subprocess.PIPE)
 
                     frameCountFound = ffprobeRet.stdout.decode('utf-8')
@@ -660,11 +654,14 @@ class Task:
             if missing or (int(frameCountExpected) != int(frameCountFound)):
                 self.taskLogger.info("Found failed job {}".format(str(chunk)))
                 chunkName = chunk.split('/')[1]
+
                 self.taskLogger.debug("chunkName: " + str(chunkName))
                 chunkNumber = re.match('^(\d{3,7})_.*\.265', chunkName)
+
                 self.taskLogger.debug("chunkNumber: " + str(chunkNumber.group(1)))
                 self.taskLogger.debug("jobHandles len: " + str(len(jobHandles)))
                 offender = jobHandles[int(chunkNumber.group(1))]
+
                 self.taskLogger.debug("offender: " + str(offender))
                 redoJobs.append(offender)
 
@@ -724,10 +721,10 @@ class Task:
         else:
             quiet = '--quiet'
 
-        cmd = ['mkvmerge', quiet, '--output', \
-                r'"{}"'.format(tempFileName), \
-                '-D', \
-                r'"{}"'.format(self.target), \
+        cmd = ['mkvmerge', quiet, '--output', 
+                r'"{}"'.format(tempFileName), 
+                '-D', 
+                r'"{}"'.format(self.target), 
                 r'"{}"'.format(noAudioFile)]
 
         cmdString = ' '.join(cmd)

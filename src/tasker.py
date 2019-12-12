@@ -16,16 +16,15 @@ outbox = "/ute/outbox"
 doneDir = "done"
 highPriorityDir = "high"
 logLevel = logging.DEBUG
-config_jobTimeout = 200
+config_jobTimeout = 300
 config_cropSampleCount = 17
 config_timeOffsetPercent = 0.15
 config_frameBufferSize = 100
 config_jobSize = 150
-config_checkWorkThreadCount = 3
+config_checkWorkThreadCount = 8
 config_findWorkThreadCountMax = 4
 
-#logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
-#logging.basicConfig(level=logging.DEBUG)
+## logging setup for aggregator container
 rootLogger = logging.getLogger('ute')
 rootLogger.setLevel(logLevel)
 socketHandler = logging.handlers.SocketHandler('aggregator', 
@@ -218,7 +217,7 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
             'workers' : taskWorkers })
 
     frameCountTotal, frameRate, duration = task.getFrameCount()
-    encodeTasks, outboundFile, chunkPaths = task.buildCmdString( \
+    encodeTasks, outboundFile, chunkPaths = task.buildCmdString(
             frameCountTotal, frameRate, duration)
 
     ## determine full path of folder for video chunks and create folder if not present
@@ -230,7 +229,7 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
     if there's existing work already, CheckForPriorWork() will shorten the 
     'encodeTasks' list for PopulateQueue()
     '''
-    encodeTasksReference, encodeTasksActual = task.CheckForPriorWork(encodeTasks, \
+    encodeTasksReference, encodeTasksActual = task.CheckForPriorWork(encodeTasks,
             chunkPaths, taskWorkers)
 
     q, jobHandles = task.PopulateQueue(q, encodeTasksActual)
@@ -249,6 +248,12 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
     else:
         jobHandlesReference = jobHandles
 
+
+    
+    tCount = config_checkWorkThreadCount
+    ## how many chunks per CheckWork() thread
+    checkSize = int(len(chunkPaths) / tCount)
+
     while True:
         taskerLogger.info("TID:{} Waiting on jobs".format(str(threadId)))
         task.WaitForTaskCompletion(q, jobHandles.copy())
@@ -256,9 +261,6 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
         taskerLogger.info("TID:{} Checking work for errors".format(str(threadId)))
         threadArray = []
         jobHandlesTemp = []
-        tCount = config_checkWorkThreadCount
-        ## how many chunks per CheckWork() thread
-        checkSize = int(len(chunkPaths) / tCount)
 
         '''
         Once WaitForTaskCompletion has finished, initiate a check on the chunks of video to ensure
@@ -270,21 +272,16 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
             ## prime jobHandlesTemp
             jobHandlesTemp.append([])
 
+            ## (re)calculate range of chunk paths to send each thread
             start = t * checkSize
-            end = (t+1) * checkSize
+            end = ((t + 1) * checkSize) + 1   ## because a[i:j] only goes to j-1
 
             ## in case we come up short on math, make sure last thread gets the rest
             if t == tCount - 1:
-                end = len(chunkPaths) - 1
-
-            ## temp debugging DELETE ME
-            taskerLogger.debug("t {} - start/end: {}/{}".format(str(t), str(start), str(end)))
-            taskerLogger.debug("t {} - jobHandlesReference len {} ".format(str(t), str(len(jobHandlesReference))))
-            taskerLogger.debug("t {} - jobHandlesReference[s:e] len {}".format(str(t), str(len(jobHandlesReference[start:end]))))
-
+                end = len(chunkPaths)
 
             taskerLogger.debug("TID:{} CheckWork() range start/end: {} / {}".format(str(threadId),
-                str(start), str(end)))
+                str(start), str(end - 1)))
 
             '''
             Create a thread as many times as configured by the user. These threads run CheckWork() 
@@ -292,10 +289,9 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
             used to create those chunks, a reference to a temporary array to return their list of 
             chunks requiring requeing, and the index in which to place their array of failed chunks
             '''
-            thread = threading.Thread( \
-                target = task.CheckWork, \
+            thread = threading.Thread(
+                target = task.CheckWork,
                 args = (chunkPaths[start:end], jobHandlesReference, jobHandlesTemp, t))
-#                args = (chunkPaths[start:end], jobHandlesReference[start:end], jobHandlesTemp, t))
 
             taskerLogger.debug("TID:{} Starting CheckWork thread {}".format(str(threadId), str(t)))
             thread.start()
@@ -308,27 +304,52 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
             threadArray[i].join()
             taskerLogger.debug("TID:{} CheckWork thread {} returned".format(str(threadId), str(i)))
 
-        ## combine the failed chunks of all CheckWork() threads into jobHandles[]
+        ## combine the failed chunks (if any) of all CheckWork() threads into jobHandles[]
         jobHandles = []
         debugCtr = 0
-        for array in jobHandlesTemp:
+        for i, array in enumerate(jobHandlesTemp):
             jobHandles += array
             taskerLogger.debug("TID:{} CheckWork thread {} length: {}".format(str(threadId), 
                 str(i), len(array)))
             debugCtr += 1
 
-        ## if we have failed jobs, requeue them
-        ## jobHandles is an array of tuples
+        '''
+        if we have failed jobs, requeue them
+
+        chunkPaths takes a tuple whos contents look like ('/ute/outbox', 'movie_folder/chunk_name')
+        we have the first element from the outbox var, but the second one we'll dig out from the 
+        job's argument string
+
+        FYI, jobHandles is also an array of tuples
+        '''
         if len(jobHandles) > 0:
+            chunkPaths = []
             for jobId, job in jobHandles:
                 task.RequeueJob(job.args, q, jobId)
+                jobPath = re.search(r' -o .*?(/.*\.265)', str(job.args))
+                subPath = jobPath.group(1).split(outbox)[-1][1:]
+                chunkPaths.append((outbox, subPath))
+
+                taskerLogger.debug("TID:{} jobPath: {}".format(str(threadId), str(jobPath.group(1))))
                 taskerLogger.debug("TID:{} Requeuing {}".format(str(threadId), str(jobId)))
 
             taskerLogger.info("TID:{} Waiting for requeued jobs to complete".format(str(threadId)))
+
+            '''
+            recalculate some things for our requeue chunks. we don't want to re-check all
+            chunks just to verify a small subset.
+            '''
+            if len(jobHandles) < tCount:
+                tCount = 1
+
+            taskerLogger.debug("TID:{} chunkPaths len {}".format(str(threadId), str(len(chunkPaths))))
+            checkSize = int(len(chunkPaths) / tCount)
+            continue
         else:
             break
 
 
+    ## wrap things up. merge chunks, merge audio, handle source file, etc
     taskerLogger.info("TID:{} Building new Matroska file".format(str(threadId)))
     noAudioFile = task.RebuildVideo(fullOutboundPath)
 
@@ -428,8 +449,8 @@ def main():
             if threadId > 9999:
                 threadId = 1
 
-            thread = threading.Thread( \
-                target = taskManager, \
+            thread = threading.Thread(
+                target = taskManager, 
                 args = (targetQueue, redisLink, targetFile, workerCount, threadId, rqDummy))
 
             taskerLogger.debug("Starting thread")
