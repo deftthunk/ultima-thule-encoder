@@ -16,12 +16,12 @@ outbox = "/ute/outbox"
 doneDir = "done"
 highPriorityDir = "high"
 logLevel = logging.DEBUG
-config_jobTimeout = 300
+config_jobTimeout = 500
 config_cropSampleCount = 17
 config_timeOffsetPercent = 0.15
-config_frameBufferSize = 100
-config_jobSize = 150
-config_checkWorkThreadCount = 8
+config_frameBufferSize = 150
+config_jobSize = 200
+config_checkWorkThreadCount = 4
 config_findWorkThreadCountMax = 4
 
 ## logging setup for aggregator container
@@ -253,6 +253,9 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
     tCount = config_checkWorkThreadCount
     ## how many chunks per CheckWork() thread
     checkSize = int(len(chunkPaths) / tCount)
+    ## if the same chunk(s) keeps failing, track it to prevent an infinite fail
+    failCount = 0
+    retainChunks = False
 
     while True:
         taskerLogger.info("TID:{} Waiting on jobs".format(str(threadId)))
@@ -344,6 +347,28 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
 
             taskerLogger.debug("TID:{} chunkPaths len {}".format(str(threadId), str(len(chunkPaths))))
             checkSize = int(len(chunkPaths) / tCount)
+
+            '''
+            to avoid getting caught in an endless loop, we set a limit for how many times a failed
+            chunk can be requeued. sometimes there's something wrong with the source video, or a
+            worker, etc.
+
+            if this gets triggered, we'll try to be helpful by: 
+            - leaving chunks in place for a later attempt
+            - attempting to build video anyway (hey, it might just work)
+            - create scripts? for the mkvmerge commands (video/audio) so the user can try manually
+            - create a local log file of what went wrong in the output folder
+            '''
+            if failCount > 2:
+                msg = "TID:{} Video has failed {} times. ".format(str(threadId), str(failCount-1))
+                msg += "Attempting to rebuild video in current state, but will leave chunk files "
+                msg += "intact until video can be verified."
+                taskerLogger.info(str(msg))
+
+                retainChunks = True
+                break
+
+            failCount += 1
             continue
         else:
             break
@@ -356,9 +381,12 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
     taskerLogger.info("TID:{} Merging audio tracks into new MKV file".format(str(threadId)))
     finalFileName = task.MergeAudio(noAudioFile, fullOutboundPath)
 
-    sleep(1)
-    taskerLogger.info("TID:{} Clearing out '.265' chunk files".format(str(threadId)))
-    task.CleanOutFolder(fullOutboundPath, finalFileName)
+    if retainChunks == False:
+        sleep(1)
+        taskerLogger.info("TID:{} Clearing out '.265' chunk files".format(str(threadId)))
+        task.CleanOutFolder(fullOutboundPath, finalFileName)
+    else:
+        taskerLogger.info("TID:{} Retaining '.265' chunk files".format(str(threadId)))
 
     sleep(1)
     task.IndicateCompleted()

@@ -272,7 +272,7 @@ class Task:
                     --colorprim bt709 \
                     --transfer bt709 \
                     --colormatrix bt709 \
-                    --crf=17 \
+                    --crf=22 \
                     --fps {frt} \
                     --min-keyint 24 \
                     --keyint 240 \
@@ -587,7 +587,7 @@ class Task:
             try:
                 ## if only file header found, consider missing
                 fSize = os.path.getsize('/'.join([folder, chunk]))
-                if fSize < 4 * 1024:
+                if fSize < (4 * 1024):
                     missing = True
                 else:
                     ffprobeRet = subprocess.run(["ffprobe", 
@@ -623,6 +623,8 @@ class Task:
                             self.taskLogger.warning("chunk: {}".format(str(path)))
                             self.taskLogger.warning("flagging chunk for requeue")
                             self.taskLogger.debug("data : " + str(data.stdout.decode('utf-8')))
+                            ## DEBUGGING REMOVE ME
+                            shutil.copy2(path, self.outbox)
                     elif chunkEnd == None:
                         try:
                             frameCountExpected = int(totalFrames) - int(chunkStart.group(1))
@@ -634,8 +636,6 @@ class Task:
                                 str(error)))
                             self.taskLogger.error("chunk: " + str(path))
                     else:
-                        #self.taskLogger.debug("chunkStart: " + chunkStart.group(1))
-                        #self.taskLogger.debug("chunkEnd: " + chunkEnd.group(1))
                         frameCountExpected = int(chunkEnd.group(1)) - int(chunkStart.group(1))
 
                     self.taskLogger.debug("Frames Found/Expected: {}/{} :: {}".format(
@@ -667,7 +667,6 @@ class Task:
 
 
         returnArray[returnIndex] = redoJobs
-        #return redoJobs
 
 
     '''

@@ -51,4 +51,6 @@ ffmpeg_config:
 #  hide_banner: 
 
 
-
+## mkvmerge Settings
+  generate-chapters:
+    interval: "300s"
