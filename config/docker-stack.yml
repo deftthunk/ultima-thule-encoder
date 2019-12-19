@@ -36,7 +36,9 @@ services:
     deploy:
       replicas: 1
       placement:
-        constraints: [node.role == manager]
+#        constraints: [node.role == manager]
+        constraints:
+          - node.labels.name == t410
     networks:
       ute_net:
 
@@ -112,7 +114,11 @@ services:
     deploy:
       replicas: 1
       placement:
-        constraints: [node.role == manager]
+#        constraints: [node.role == manager]
+        constraints:
+          - node.labels.name == t410
+
+
 
   ## defines a task to run the celery worker container in. these tasks are 
   ## replicated through the docker swarm nodes the 'cpus' key reflects how 
@@ -276,7 +282,7 @@ services:
           - node.labels.name == motoko
       resources:
         limits:
-          cpus: '7'
+#          cpus: '10'
           memory: 6000M
 
 

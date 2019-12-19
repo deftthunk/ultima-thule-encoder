@@ -272,7 +272,7 @@ class Task:
                     --colorprim bt709 \
                     --transfer bt709 \
                     --colormatrix bt709 \
-                    --crf=22 \
+                    --crf=16 \
                     --fps {frt} \
                     --min-keyint 24 \
                     --keyint 240 \
@@ -754,16 +754,29 @@ class Task:
 
 
     '''
-    creates a "done" directory and moves the completed video file into the folder.
+    creates a "done" directory for both inbox and outbox, and moves the completed video files 
+    into the folder.
     '''
-    def IndicateCompleted(self):
-        ## check if completed folder is present
-        doneFolder = '/'.join([self.inbox, self.doneDir])
-        os.makedirs(doneFolder, 0o777, exist_ok=True)
+    def IndicateCompleted(self, completedFolder):
+        ## check if completed folder is present for inbox
+        doneInbox = '/'.join([self.inbox, self.doneDir])
+        os.makedirs(doneInbox, 0o777, exist_ok=True)
 
         ## move source file to 'done' folder in inbox
-        moveTargetPath = '/'.join([doneFolder, self._getFileName(self.target)])
-        self.taskLogger.debug("file move: {}".format(str(moveTargetPath)))
-        shutil.move(self.target, moveTargetPath)
+        moveTargetInboxPath = '/'.join([doneInbox, self._getFileName(self.target)])
+        self.taskLogger.debug("file move: {}".format(str(moveTargetInboxPath)))
+        shutil.move(self.target, moveTargetInboxPath)
+
+        ## check if completed folder is present for outbox
+        doneOutbox = '/'.join([self.outbox, self.doneDir])
+        os.makedirs(doneOutbox, 0o777, exist_ok=True)
+
+        ## move finished file(s) to 'done' folder in outbox
+        moveTargetOutboxPath = '/'.join([doneOutbox, completedFolder])
+        self.taskLogger.debug("folder move: {}".format(str(moveTargetOutboxPath)))
+        shutil.move(completedFolder, moveTargetOutboxPath)
+
+
+
 
 

@@ -29,8 +29,8 @@ def encode(cmd):
 
     ## give container a chance to write everything out to network drive. otherwise
     ## it can give RQ problems and hang
-    flush = os.system('sync')
-    sleep(0.5)
+    jobPath = re.search(r' -o .*?(/.*\.265)', str(cmd))
+    flush = subprocess.run(["sync", "-f", jobPath.group(1)], close_fds=True)
 
     return (fps, host, node)
 

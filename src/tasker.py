@@ -16,12 +16,12 @@ outbox = "/ute/outbox"
 doneDir = "done"
 highPriorityDir = "high"
 logLevel = logging.DEBUG
-config_jobTimeout = 500
+config_jobTimeout = 300
 config_cropSampleCount = 17
 config_timeOffsetPercent = 0.15
-config_frameBufferSize = 150
+config_frameBufferSize = 50
 config_jobSize = 200
-config_checkWorkThreadCount = 4
+config_checkWorkThreadCount = 6
 config_findWorkThreadCountMax = 4
 
 ## logging setup for aggregator container
@@ -248,7 +248,6 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
     else:
         jobHandlesReference = jobHandles
 
-
     
     tCount = config_checkWorkThreadCount
     ## how many chunks per CheckWork() thread
@@ -389,7 +388,7 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
         taskerLogger.info("TID:{} Retaining '.265' chunk files".format(str(threadId)))
 
     sleep(1)
-    task.IndicateCompleted()
+    task.IndicateCompleted(fullOutboundPath)
     taskerLogger.info("\nTID:{} Finished {}".format(str(threadId), str(targetFile)))
 
 
@@ -437,7 +436,6 @@ def main():
                 targetQueue = rqHigh
                 newThread = True
                 highPriority = True
-                highThreads += 1
 
                 '''
                 if there's already a thread, delay creation of a second thread to
@@ -446,6 +444,8 @@ def main():
                 '''
                 if highThreads == 1:
                     sleep(30)
+
+                highThreads += 1
             except IndexError:
                 taskerLogger.error("Unable to find files in High Queue")
 
@@ -455,7 +455,6 @@ def main():
                 targetFile = workQLow.popleft()
                 targetQueue = rqLow
                 newThread = True
-                lowThreads += 1
 
                 '''
                 if there's already a thread, delay creation of a second thread to
@@ -463,7 +462,10 @@ def main():
                 a few seconds to push jobs to Redis
                 '''
                 if lowThreads == 1:
-                    sleep(10)
+                    taskerLogger.debug("sleeping thread create")
+                    sleep(60)
+
+                lowThreads += 1
             except IndexError:
                 taskerLogger.error("Unable to find files in Low Queue")
 
@@ -504,8 +506,7 @@ def main():
         if not delThreadItem == None:
             del threadKeeper[delThreadItem]
 
-        #taskerLogger.debug("End loop, sleep 10")
-        sleep(15)
+        sleep(5)
 
 
 
