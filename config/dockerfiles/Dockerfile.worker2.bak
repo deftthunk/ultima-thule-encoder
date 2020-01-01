@@ -1,0 +1,55 @@
+FROM ubuntu:19.10 AS builder
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y \
+    build-essential unzip gcc g++ cmake curl linux-headers-generic bash 
+RUN apt-get install -y git mercurial nasm yasm libtool pkg-config autoconf automake coreutils python3-dev
+RUN apt install -y fftw-dev libpng-dev libsndfile-dev pkgconf libxvidcore-dev libbluray-dev
+RUN apt install -y zlib1g-dev intel-opencl-icd nvidia-opencl-icd-384 pocl-opencl-icd opencl-dev 
+RUN apt install -y opencl-headers python3-pip libboost-filesystem1.67 libboost-system1.67 checkinstall ffmpeg
+
+RUN pip3 install cython && \
+    sed -i 's/ash/bash/g' /etc/passwd && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python2.7/site-packages" >> /etc/profile && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python3/site-packages" >> /etc/profile && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python3.7/site-packages" >> /etc/profile
+
+# zimg
+RUN git clone https://github.com/sekrit-twc/zimg.git && \
+    cd zimg && \
+    ./autogen.sh && bash -c ./configure && \
+    make -j$(nproc) && \
+		#checkinstall --install=no --default --pkgversion '1.0' --strip --stripso --pkgname 'zimg' && \
+		make install && \
+		#mv *.deb / && \
+		cd .. && \
+		rm -rf zimg
+
+# Vapoursynth
+RUN git clone https://github.com/vapoursynth/vapoursynth.git && \
+    cd vapoursynth && \
+    ./autogen.sh && bash -c ./configure && \
+    make -j$(nproc) && \
+		#checkinstall --install=no --default --pkgversion '1.0' --strip --stripso --pkgname 'vs' && \
+		make install && \
+		#mv *.deb / && \	
+    cd .. && rm -rf vapoursynth
+
+# Plugins  
+RUN git clone https://github.com/darealshinji/vapoursynth-plugins.git && \
+    cd vapoursynth-plugins && \
+    ./autogen.sh && bash -c ./configure && \
+    make -j$(nproc) && \
+		#checkinstall --install=no --default --pkgversion '1.0' --strip --stripso --pkgname 'plugins' && \
+		make install && \
+		#mv *.deb / && \
+    cd .. && rm -rf vapoursynth-plugins
+
+
+RUN pip3 install vapoursynth && ldconfig
+VOLUME ['/opt']
+
+WORKDIR [ '/opt' ]
+ENTRYPOINT [ "/bin/bash", "-l" ]

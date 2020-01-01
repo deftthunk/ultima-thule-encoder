@@ -36,9 +36,8 @@ services:
     deploy:
       replicas: 1
       placement:
-#        constraints: [node.role == manager]
-        constraints:
-          - node.labels.name == t410
+        constraints: 
+          - node.role == manager
     networks:
       ute_net:
 
@@ -96,7 +95,8 @@ services:
     deploy:
       replicas: 1
       placement:
-        constraints: [node.role == manager]
+        constraints: 
+          - node.role == manager
 
 
   ## tasker drives the worker tasking by building jobs from files and 
@@ -114,9 +114,10 @@ services:
     deploy:
       replicas: 1
       placement:
-#        constraints: [node.role == manager]
-        constraints:
-          - node.labels.name == t410
+        constraints: 
+          - node.role == manager
+#        constraints:
+#          - node.labels.name == t410
 
 
 
@@ -271,6 +272,7 @@ services:
     volumes:
       - nfs-in:/ute/inbox
       - nfs-out:/ute/outbox
+      - nfs-scripts:/ute/scripts
       - x265-vol:/ute/x265
     networks:
       ute_net:
@@ -280,10 +282,10 @@ services:
       placement:
         constraints:
           - node.labels.name == motoko
-      resources:
-        limits:
+#      resources:
+#        limits:
 #          cpus: '10'
-          memory: 6000M
+#          memory: 6000M
 
 
   ## worker service with resource values for a different system. service name
@@ -362,3 +364,12 @@ volumes:
 #      o: addr=10.168.1.111,rw,cto,nolock,noresvport
       device: ":/volume1/ute/outbox"
 #      device: ":/mnt/user/work/ute/outbox"
+
+  nfs-scripts:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=10.41.0.109,rw,cto,sync,nolock,noresvport
+#      o: addr=10.168.1.111,rw,cto,nolock,noresvport
+      device: ":/volume1/ute/scripts"
+#      device: ":/mnt/user/work/ute/scripts"

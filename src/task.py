@@ -14,6 +14,8 @@ class Task:
         self.threadId = configDict['threadId']
         self.inbox = configDict['inbox']
         self.outbox = configDict['outbox']
+        self.vsScripts = configDict['vsScripts']
+        self.vsScriptName = configDict['vsScriptName']
         self.target = configDict['target']
         self.doneDir = configDict['doneDir']
         self.logLevel = configDict['logLevel']
@@ -23,6 +25,7 @@ class Task:
         self.task_workers = configDict['workers']
         self.jobSize = configDict['jobSize']
         self.frameBufferSize = configDict['frameBufferSize']
+        self.vapoursynth = configDict['vapoursynthEnabled']
 
         self.avgFps = {}
         self.outboundFolderPath = self.MakeOutboundFolderPath()
@@ -187,8 +190,9 @@ class Task:
     '''
     def buildCmdString(self, frameCountTotal, frameRate, duration):
         encodeTasks = []
-        fileString = ''
+        fileString, vsScriptPath, vsPipeStr = '', '', ''
         frameBufferSize = self.frameBufferSize
+        ffmpegTarget = "-i \'" + self.target + '\''
         jobSize = self.jobSize
         jobCount = int(math.ceil(frameCountTotal / jobSize))
         chunkPaths = [] ## store paths of each encoded chunk for checking later
@@ -247,6 +251,11 @@ class Task:
         frames = jobSize + frameBufferSize
         _genFileString()
 
+        if self.vapoursynth:
+            vsScriptPath = '/'.join([self.vsScripts, self.vsScriptName])
+            ffmpegTarget = '-i -'
+            vsTarget = "UTE_TARGET=" + '\'' + self.target + '\''
+
         self.taskLogger.debug("jobCount / jobSize / frameCountTotal: {}/{}/{}".format( 
                 str(jobCount), 
                 str(jobSize), 
@@ -255,48 +264,66 @@ class Task:
         ## ffmpeg and x265 CLI args, with placeholder variables defined in the 
         ## .format() method below
         while counter <= jobCount:
-            ffmpegStr = "ffmpeg \
-                    -hide_banner \
-                    -loglevel fatal \
-                    -ss {sec} \
-                    -i '{tr}' \
-                    {cd} \
-                    -strict \
-                    -1 \
-                    -f yuv4mpegpipe - | x265 - \
-                    --log-level info \
-                    --no-open-gop \
-                    --frames {fr} \
-                    --chunk-start {cs} \
-                    --chunk-end {ce} \
-                    --colorprim bt709 \
-                    --transfer bt709 \
-                    --colormatrix bt709 \
-                    --crf=16 \
-                    --fps {frt} \
-                    --min-keyint 24 \
-                    --keyint 240 \
-                    --sar 1:1 \
-                    --preset slow \
-                    --ctu 64 \
-                    --y4m \
-                    --pools \"+\" \
-                    -o '{dst}/{fStr}'".format( 
-                    tr = self.target, 
-                    cd = crop, 
-                    fr = frames, 
-                    cs = chunkStart, 
-                    ce = chunkEnd, 
-                    ctr = counter, 
-                    frt = frameRate, 
-                    sec = seconds, 
-                    dst = self.outbox, 
-                    fStr = fileString)
+            if self.vapoursynth:
+                try:
+                    ## set ffmpeg index to zero each time
+                    seconds = 0
+                    frameStart = seek
+                    frameEnd = seek + jobSize
+                    vsPipeStr = "vspipe --start {fs} --end {fe} --arg {tar} {sp} - --y4m | ".format(  
+                                fs = frameStart,
+                                fe = frameEnd,
+                                tar = vsTarget,
+                                sp = vsScriptPath)
+                except Exception as e:
+                  self.taskLogger.error("Vapoursynth string build failed: {}".format(str(e)))
+
+            try:
+                ffmpegStr = "{vs} ffmpeg \
+                        -hide_banner \
+                        -loglevel fatal \
+                        -ss {sec} \
+                        {tr} \
+                        {cd} \
+                        -strict \
+                        -1 \
+                        -f yuv4mpegpipe - | x265 \
+                        --log-level info \
+                        --no-open-gop \
+                        --frames {fr} \
+                        --chunk-start {cs} \
+                        --chunk-end {ce} \
+                        --colorprim bt709 \
+                        --transfer bt709 \
+                        --colormatrix bt709 \
+                        --crf=16 \
+                        --fps {frt} \
+                        --min-keyint 24 \
+                        --keyint 240 \
+                        --sar 1:1 \
+                        --preset slow \
+                        --ctu 64 \
+                        --y4m \
+                        --pools \"+\" \
+                        -o '{dst}/{fStr}' - ".format(
+                        vs = vsPipeStr,
+                        tr = ffmpegTarget, 
+                        cd = crop, 
+                        fr = frames, 
+                        cs = chunkStart, 
+                        ce = chunkEnd, 
+                        ctr = counter, 
+                        frt = frameRate, 
+                        sec = seconds, 
+                        dst = self.outbox, 
+                        fStr = fileString)
+            except Exception as e:
+              self.taskLogger.error("FFmpeg/x265 string build failed: {}".format(str(e)))
 
             ## push built CLI command onto end of list
             encodeTasks.append(' '.join(ffmpegStr.split()))
             ## if debugging, cut out excess spaces from command string
-            #self.taskLogger.debug(' '.join(ffmpegStr.split()))
+            self.taskLogger.debug(' '.join(ffmpegStr.split()))
 
             chunkStart = frameBufferSize
             if counter == 0:

@@ -13,16 +13,19 @@ from .task import Task
 
 inbox = "/ute/inbox"
 outbox = "/ute/outbox"
+vsScripts = "/ute/scripts/vs"
 doneDir = "done"
 highPriorityDir = "high"
 logLevel = logging.DEBUG
-config_jobTimeout = 300
+config_jobTimeout = 200
 config_cropSampleCount = 17
 config_timeOffsetPercent = 0.15
 config_frameBufferSize = 50
 config_jobSize = 200
 config_checkWorkThreadCount = 6
 config_findWorkThreadCountMax = 4
+config_vapoursynthEnabled = True
+config_vsScriptName = 'denoise_best.py'
 
 ## logging setup for aggregator container
 rootLogger = logging.getLogger('ute')
@@ -206,6 +209,7 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
             'threadId' : threadId,
             'inbox' : inbox,
             'outbox' : outbox,
+            'vsScripts' : vsScripts,
             'target' : targetFile,
             'logLevel' : logLevel,
             'doneDir' : doneDir,
@@ -213,13 +217,16 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
             'cropSampleCount' : config_cropSampleCount,
             'timeOffsetPercent' : config_timeOffsetPercent,
             'frameBufferSize' : config_frameBufferSize,
+            'vapoursynthEnabled' : config_vapoursynthEnabled,
+            'vsScriptName' : config_vsScriptName,
             'jobSize' : config_jobSize,
             'workers' : taskWorkers })
 
+    taskerLogger.debug("TEST")
     frameCountTotal, frameRate, duration = task.getFrameCount()
     encodeTasks, outboundFile, chunkPaths = task.buildCmdString(
             frameCountTotal, frameRate, duration)
-
+    taskerLogger.debug("TEST2")
     ## determine full path of folder for video chunks and create folder if not present
     fullOutboundPath = task.MakeOutboundFolderPath()
     taskerLogger.info("TID:{} Outbound path: {}".format(str(threadId), str(fullOutboundPath)))
