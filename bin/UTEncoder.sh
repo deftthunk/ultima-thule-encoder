@@ -17,6 +17,7 @@ elif [[ $1 == 'down' ]]; then
   docker container prune -f
   docker volume rm "$stackName"_nfs-in
   docker volume rm "$stackName"_nfs-out
+	docker volume rm "$stackName"_nfs-scripts
 fi
 
 

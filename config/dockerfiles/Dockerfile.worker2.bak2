@@ -1,0 +1,117 @@
+FROM ubuntu:19.10 AS builder
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt-get update 
+RUN apt-get upgrade -y 
+RUN apt-get install -y build-essential unzip gcc g++ cmake curl linux-headers-generic bash \
+		git mercurial nasm yasm libtool pkg-config autoconf automake coreutils python3-dev \
+		fftw-dev libpng-dev libsndfile-dev libxvidcore-dev libbluray-dev zlib1g-dev intel-opencl-icd \
+		nvidia-opencl-icd-384 pocl-opencl-icd opencl-dev opencl-headers python3-pip \
+		libboost-filesystem1.67 libboost-system1.67 checkinstall ffmpeg
+
+RUN pip3 install cython && \
+    sed -i 's/ash/bash/g' /etc/passwd && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python2.7/site-packages" >> /etc/profile && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python3/site-packages" >> /etc/profile && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python3.7/site-packages" >> /etc/profile && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/vapoursynth" >> /etc/profile && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python3" >> /etc/profile && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/home/utbot/.local/lib/python3.7/site-packages" >> /etc/profile && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/vapoursynth" >> /etc/profile
+
+## zimg
+RUN git clone https://github.com/sekrit-twc/zimg.git && \
+    cd zimg && \
+    ./autogen.sh && bash -c ./configure && \
+    make -j$(nproc) && \
+		checkinstall --install=no --default --pkgversion '1.0' --strip --stripso --pkgname 'zimg' && \
+		mv *.deb / && \
+		cd .. && \
+		rm -rf zimg
+
+## vapoursynth
+RUN git clone https://github.com/vapoursynth/vapoursynth.git && \
+    cd vapoursynth && \
+    ./autogen.sh && bash -c ./configure && \
+    make -j$(nproc) && \
+		checkinstall --install=no --default --pkgversion '1.0' --strip --stripso --pkgname 'vs' && \
+		mv *.deb / && \	
+    cd .. && rm -rf vapoursynth
+
+## vs plugins  
+RUN git clone https://github.com/darealshinji/vapoursynth-plugins.git && \
+    cd vapoursynth-plugins && \
+    ./autogen.sh && bash -c ./configure && \
+    make -j$(nproc) && \
+		checkinstall --install=no --default --pkgversion '1.0' --strip --stripso --pkgname 'plugins' && \
+		mv *.deb / && \
+    cd .. && rm -rf vapoursynth-plugins
+
+
+
+FROM debian:buster-slim
+
+## add x265, its shared libraries, and paths
+COPY ./resources/worker/ute_lib.conf /etc/ld.so.conf.d/ute_lib.conf
+COPY ./resources/worker/sources.list /etc/apt/sources.list
+## grab our newly built packages from the prior build stage
+COPY --from=builder /*.deb /
+
+## install packages, add user 'utbot', and update shared lib path
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+        python3-pip \
+        python3-setuptools \
+        python3-wheel \
+        python3-dev \
+        apt-utils \
+        locales-all \
+        gosu \
+				gcc \
+				ocl-icd-libopencl1 \
+				beignet-opencl-icd \
+				nvidia-opencl-icd \
+				pocl-opencl-icd \
+				libboost-filesystem1.67 \
+				libboost-system1.67 \
+        ffmpeg && \
+	apt-get clean && \
+	rm -rf /var/lib/apt/lists/* && \
+  useradd -ms /bin/bash utbot && \
+  mkdir -p /ute/x265 && \
+	dpkg -i /zimg*.deb && \
+	dpkg -i /vs*.deb && \
+	dpkg -i /plugins*.deb
+#	rm /*.deb
+
+RUN echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python2.7/site-packages" >> /etc/profile && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python3/site-packages" >> /etc/profile && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python3.7/site-packages" >> /etc/profile && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/vapoursynth" >> /etc/profile && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python3" >> /etc/profile && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/home/utbot/.local/lib/python3.7/site-packages" >> /etc/profile && \
+    echo "export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/vapoursynth" >> /etc/profile
+
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
+
+VOLUME [ "/ute/x265" ]
+
+## become user 'utbot', change working dir, install RQ
+USER utbot
+WORKDIR /home/utbot
+RUN pip3 install cython vapoursynth rq --user
+
+## add main script loop, UTE python celery code, and
+## set celery execution path
+COPY ./resources/worker/run.sh /home/utbot/run.sh
+COPY ./resources/worker/run_root.sh /run_root.sh
+COPY ./src /home/utbot/utecode/
+ENV PATH="/home/utbot/.local/bin:${PATH}"
+ENV PATH="/ute/x265:${PATH}"
+
+USER root
+
+CMD [ "/run_root.sh" ]

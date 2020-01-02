@@ -22,6 +22,15 @@ sleep 10
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 
+export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python2.7/site-packages
+export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python3/site-packages
+export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python3.7/site-packages
+export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/vapoursynth
+export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/python3
+export PYTHONPATH=${PYTHONPATH}:/home/utbot/.local/lib/python3.7/site-packages
+export PYTHONPATH=${PYTHONPATH}:/usr/local/lib/vapoursynth
+
+
 rand=$(( ( RANDOM % 10000 ) + 1 ))
 while true; do
   cd /home/utbot/utecode
