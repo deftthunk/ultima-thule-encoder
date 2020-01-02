@@ -10,7 +10,7 @@
 ## and placed in "/home/utbot/" and executed. Changes here will not be 
 ## reflected in execution until a new Docker tasker image is created and 
 ## deployed.
-sleep 15 
+sleep 25
 
 watchdog=0
 while true; do

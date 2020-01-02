@@ -24,3 +24,70 @@ BUGS:
 task. try sleeping on worker or requeue for a few seconds to avoid?
 
 
+
+
+
+worker error:
+
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 35 seconds.
+sync: error opening "/ute/outbox/White Collar.S03E02.Where There's a Will.mkv/004_White Col.265": No such file or directory
+16:21:20 Handling successful execution of job 94a6c516-7010-4132-ae0c-1f0adeacd88d
+DEBUG:rq.worker:Handling successful execution of job 94a6c516-7010-4132-ae0c-1f0adeacd88d
+16:21:20 low: Job OK (94a6c516-7010-4132-ae0c-1f0adeacd88d)
+INFO:rq.worker:low: Job OK (94a6c516-7010-4132-ae0c-1f0adeacd88d)
+16:21:20 Result: "(0, 'esx', '5827b2c3ae84')"
+DEBUG:rq.worker:Result: "(0, 'esx', '5827b2c3ae84')"
+16:21:20 Result is kept for 500 seconds
+INFO:rq.worker:Result is kept for 500 seconds
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 420 seconds.
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 420 seconds.
+16:21:20 *** Listening on high,low...
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 420 seconds.
+16:21:20 low: worker.encode('ffmpeg -hide_banner -loglevel fatal -ss 22.94 -i \'/ute/inbox/White Collar.S03E02.Where There\'s a Will.mkv\' -filter:v "crop=1264:720:8:0" -strict -1 -f yuv4mpegpipe - | x265 - --log-level info --no-open-gop --frames 300 --chunk-start 50 --chunk-end 249 --colorprim bt709 --transfer bt709 --colormatrix bt709 --crf=16 --fps 23.976 --min-keyint 24 --keyint 240 --sar 1:1 --preset slow --ctu 64 --y4m --pools "+" -o \'/ute/outbox/White Collar.S03E02.Where There\'s a Will.mkv/003_White Col.265\'') (496299a8-27f2-452a-a6e7-27b8a3eaf529)
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 420 seconds.
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 35 seconds.
+sync: error opening "/ute/outbox/White Collar.S03E02.Where There's a Will.mkv/003_White Col.265": No such file or directory
+16:21:20 Handling successful execution of job 496299a8-27f2-452a-a6e7-27b8a3eaf529
+DEBUG:rq.worker:Handling successful execution of job 496299a8-27f2-452a-a6e7-27b8a3eaf529
+16:21:20 low: Job OK (496299a8-27f2-452a-a6e7-27b8a3eaf529)
+INFO:rq.worker:low: Job OK (496299a8-27f2-452a-a6e7-27b8a3eaf529)
+16:21:20 Result: "(0, 'esx', '5827b2c3ae84')"
+DEBUG:rq.worker:Result: "(0, 'esx', '5827b2c3ae84')"
+16:21:20 Result is kept for 500 seconds
+INFO:rq.worker:Result is kept for 500 seconds
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 420 seconds.
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 420 seconds.
+16:21:20 *** Listening on high,low...
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 420 seconds.
+16:21:20 low: worker.encode('ffmpeg -hide_banner -loglevel fatal -ss 14.6 -i \'/ute/inbox/White Collar.S03E02.Where There\'s a Will.mkv\' -filter:v "crop=1264:720:8:0" -strict -1 -f yuv4mpegpipe - | x265 - --log-level info --no-open-gop --frames 300 --chunk-start 50 --chunk-end 249 --colorprim bt709 --transfer bt709 --colormatrix bt709 --crf=16 --fps 23.976 --min-keyint 24 --keyint 240 --sar 1:1 --preset slow --ctu 64 --y4m --pools "+" -o \'/ute/outbox/White Collar.S03E02.Where There\'s a Will.mkv/002_White Col.265\'') (deff1e06-32d4-4f34-b74c-1a69c05834e7)
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 420 seconds.
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 35 seconds.
+sync: error opening "/ute/outbox/White Collar.S03E02.Where There's a Will.mkv/002_White Col.265": No such file or directory
+16:21:20 Handling successful execution of job deff1e06-32d4-4f34-b74c-1a69c05834e7
+DEBUG:rq.worker:Handling successful execution of job deff1e06-32d4-4f34-b74c-1a69c05834e7
+16:21:20 low: Job OK (deff1e06-32d4-4f34-b74c-1a69c05834e7)
+INFO:rq.worker:low: Job OK (deff1e06-32d4-4f34-b74c-1a69c05834e7)
+16:21:20 Result: "(0, 'esx', '5827b2c3ae84')"
+DEBUG:rq.worker:Result: "(0, 'esx', '5827b2c3ae84')"
+16:21:20 Result is kept for 500 seconds
+INFO:rq.worker:Result is kept for 500 seconds
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 420 seconds.
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 420 seconds.
+16:21:20 *** Listening on high,low...
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 420 seconds.
+16:21:20 low: worker.encode('ffmpeg -hide_banner -loglevel fatal -ss 6.26 -i \'/ute/inbox/White Collar.S03E02.Where There\'s a Will.mkv\' -filter:v "crop=1264:720:8:0" -strict -1 -f yuv4mpegpipe - | x265 - --log-level info --no-open-gop --frames 300 --chunk-start 50 --chunk-end 249 --colorprim bt709 --transfer bt709 --colormatrix bt709 --crf=16 --fps 23.976 --min-keyint 24 --keyint 240 --sar 1:1 --preset slow --ctu 64 --y4m --pools "+" -o \'/ute/outbox/White Collar.S03E02.Where There\'s a Will.mkv/001_White Col.265\'') (81125de2-d0c8-4e0a-98ff-f7e0e9a7407d)
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 420 seconds.
+16:21:20 Sent heartbeat to prevent worker timeout. Next one should arrive within 35 seconds.
+sync: error opening "/ute/outbox/White Collar.S03E02.Where There's a Will.mkv/001_White Col.265": No such file or directory
+16:21:21 Handling successful execution of job 81125de2-d0c8-4e0a-98ff-f7e0e9a7407d
+DEBUG:rq.worker:Handling successful execution of job 81125de2-d0c8-4e0a-98ff-f7e0e9a7407d
+16:21:21 low: Job OK (81125de2-d0c8-4e0a-98ff-f7e0e9a7407d)
+INFO:rq.worker:low: Job OK (81125de2-d0c8-4e0a-98ff-f7e0e9a7407d)
+16:21:21 Result: "(0, 'esx', '5827b2c3ae84')"
+DEBUG:rq.worker:Result: "(0, 'esx', '5827b2c3ae84')"
+16:21:21 Result is kept for 500 seconds
+INFO:rq.worker:Result is kept for 500 seconds
+16:21:21 Sent heartbeat to prevent worker timeout. Next one should arrive within 420 seconds.
+16:21:21 Sent heartbeat to prevent worker timeout. Next one should arrive within 420 seconds.
+16:21:21 *** Listening on high,low...
+

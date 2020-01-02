@@ -772,7 +772,8 @@ class Task:
         os.makedirs(doneOutbox, 0o777, exist_ok=True)
 
         ## move finished file(s) to 'done' folder in outbox
-        moveTargetOutboxPath = '/'.join([doneOutbox, completedFolder])
+        targetFolder = completedFolder.split('/')[-1]
+        moveTargetOutboxPath = '/'.join([doneOutbox, targetFolder])
         self.taskLogger.debug("folder move: {}".format(str(moveTargetOutboxPath)))
         shutil.move(completedFolder, moveTargetOutboxPath)
 

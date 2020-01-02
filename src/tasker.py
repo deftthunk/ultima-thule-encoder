@@ -16,13 +16,13 @@ outbox = "/ute/outbox"
 doneDir = "done"
 highPriorityDir = "high"
 logLevel = logging.DEBUG
-config_jobTimeout = 300
+config_jobTimeout = 180
 config_cropSampleCount = 17
 config_timeOffsetPercent = 0.15
 config_frameBufferSize = 50
 config_jobSize = 200
-config_checkWorkThreadCount = 6
-config_findWorkThreadCountMax = 4
+config_checkWorkThreadCount = 4
+config_findWorkThreadCountMax = 16
 
 ## logging setup for aggregator container
 rootLogger = logging.getLogger('ute')
