@@ -246,8 +246,9 @@ class Task:
             crop = "-filter:v \"{}\"".format(tempCrop)
 
         ## initial values for first loop iteration
-        seek, seconds, chunkStart = 0, 0, 0
+        seek, seconds, chunkStart, vsFrameStart = 0, 0, 0, 0
         chunkEnd = jobSize - 1
+        vsFrameEnd = jobSize + frameBufferSize
         frames = jobSize + frameBufferSize
         _genFileString()
 
@@ -266,13 +267,16 @@ class Task:
         while counter <= jobCount:
             if self.vapoursynth:
                 try:
-                    ## set ffmpeg index to zero each time
-                    seconds = 0
-                    frameStart = seek
-                    frameEnd = seek + jobSize
-                    vsPipeStr = "vspipe --start {fs} --end {fe} --arg {tar} {sp} - --y4m | ".format(  
-                                fs = frameStart,
-                                fe = frameEnd,
+                    seconds = 0   ## set ffmpeg index to zero each time
+                    if vsFrameEnd == -1:
+                        vsEndArg = ''
+                    else:
+                        vsEndArg = '--end ' + str(vsFrameEnd)
+
+                    vsPipeStr = "vspipe --start {fs} {fe} --arg {tar} {sp} - --y4m | ".format(  
+                                fs = vsFrameStart,
+                                fe = vsEndArg,
+                                #fe = vsFrameEnd,
                                 tar = vsTarget,
                                 sp = vsScriptPath)
                 except Exception as e:
@@ -296,7 +300,7 @@ class Task:
                         --colorprim bt709 \
                         --transfer bt709 \
                         --colormatrix bt709 \
-                        --crf=16 \
+                        --crf=18 \
                         --fps {frt} \
                         --min-keyint 24 \
                         --keyint 240 \
@@ -328,11 +332,14 @@ class Task:
             chunkStart = frameBufferSize
             if counter == 0:
                 seek = jobSize - chunkStart
+                vsFrameStart = seek
                 if seek < 0:
                     seek = 0
+                    vsFrameStart = 0
                 seconds = self._fileSeek(seek, frameRate)
             else:
                 seek = seek + jobSize
+                vsFrameStart = seek
                 seconds = self._fileSeek(seek, frameRate)
 
             '''
@@ -345,13 +352,21 @@ class Task:
             single frame end task. this calculation includes before/after buffer
             '''
             if (seek + (frameBufferSize * 2) + jobSize) > frameCountTotal:
-                chunkEnd = frameCountTotal - seek
+                chunkEnd = frameCountTotal - seek -  1
                 frames = chunkEnd
+                #vsFrameEnd = frameCountTotal - 1
+                ## signal to routine above that we're at the end, so it will remove
+                ## this argument from vspipe. vspipe doesn't seem to like explicitly
+                ## ending on the last frame
+                vsFrameEnd = -1
                 ## artifically decrement jobCount, since we're subsuming the last task
                 jobCount -= 1
+                self.taskLogger.debug("chunkEnd {}, frames {}, vsFrameEnd {}".format(
+                    str(chunkEnd), str(frames), str(vsFrameEnd)))
             else:
                 chunkEnd = chunkStart + jobSize - 1
                 frames = jobSize + (frameBufferSize * 2)
+                vsFrameEnd = seek + jobSize + (frameBufferSize * 2)
 
             ## create a seperate array of chunk file paths for checking our work later
             chunkPaths.append((self.outbox, fileString))
@@ -682,11 +697,11 @@ class Task:
                 self.taskLogger.info("Found failed job {}".format(str(chunk)))
                 chunkName = chunk.split('/')[1]
 
-                self.taskLogger.debug("chunkName: " + str(chunkName))
+                #self.taskLogger.debug("chunkName: " + str(chunkName))
                 chunkNumber = re.match('^(\d{3,7})_.*\.265', chunkName)
 
-                self.taskLogger.debug("chunkNumber: " + str(chunkNumber.group(1)))
-                self.taskLogger.debug("jobHandles len: " + str(len(jobHandles)))
+                #self.taskLogger.debug("chunkNumber: " + str(chunkNumber.group(1)))
+                #self.taskLogger.debug("jobHandles len: " + str(len(jobHandles)))
                 offender = jobHandles[int(chunkNumber.group(1))]
 
                 self.taskLogger.debug("offender: " + str(offender))

@@ -20,7 +20,7 @@ logLevel = logging.DEBUG
 config_jobTimeout = 200
 config_cropSampleCount = 17
 config_timeOffsetPercent = 0.15
-config_frameBufferSize = 50
+config_frameBufferSize = 75
 config_jobSize = 200
 config_checkWorkThreadCount = 4
 config_findWorkThreadCountMax = 16
@@ -222,11 +222,9 @@ def taskManager(q, redisLink, targetFile, taskWorkers, threadId, rqDummy):
             'jobSize' : config_jobSize,
             'workers' : taskWorkers })
 
-    taskerLogger.debug("TEST")
     frameCountTotal, frameRate, duration = task.getFrameCount()
     encodeTasks, outboundFile, chunkPaths = task.buildCmdString(
             frameCountTotal, frameRate, duration)
-    taskerLogger.debug("TEST2")
     ## determine full path of folder for video chunks and create folder if not present
     fullOutboundPath = task.MakeOutboundFolderPath()
     taskerLogger.info("TID:{} Outbound path: {}".format(str(threadId), str(fullOutboundPath)))
@@ -420,7 +418,7 @@ def main():
     if workerCount == 0:
         taskerLogger.debug("No workers, sleeping")
         while getClientCount(redisLink, workerList)[0] == 0:
-            sleep(30)
+            sleep(20)
 
     while True:
         ## check for files
@@ -428,7 +426,7 @@ def main():
         if fwReturn == 0 and len(threadKeeper) == 0:
             taskerLogger.info("No files; UTE sleeping")
             while findWork(workQLow, workQHigh, threadKeeper) == 0:
-                sleep(30)
+                sleep(20)
 
         ## determine if we're pulling work from High or Low queue
         targetQueue = None
@@ -450,7 +448,7 @@ def main():
                 a few seconds to push jobs to Redis
                 '''
                 if highThreads == 1:
-                    sleep(30)
+                    sleep(20)
 
                 highThreads += 1
             except IndexError:
@@ -470,7 +468,7 @@ def main():
                 '''
                 if lowThreads == 1:
                     taskerLogger.debug("sleeping thread create")
-                    sleep(60)
+                    sleep(20)
 
                 lowThreads += 1
             except IndexError:

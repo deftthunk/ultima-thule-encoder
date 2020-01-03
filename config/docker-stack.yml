@@ -142,19 +142,20 @@ services:
     volumes:
       - nfs-in:/ute/inbox
       - nfs-out:/ute/outbox
+      - nfs-scripts:/ute/scripts
       - x265-vol:/ute/x265
     networks:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 3
       placement:
         constraints:
           - node.labels.name == smaug
-      resources:
-        limits:
-          cpus: '8.0'
-          memory: 4000M
+#      resources:
+#        limits:
+#          cpus: '8.0'
+#          memory: 4000M
 
 
   ## worker service with resource values for a different system. service name
@@ -195,18 +196,18 @@ services:
       - nfs-in:/ute/inbox
       - nfs-out:/ute/outbox
       - x265-vol:/ute/x265
+      - nfs-scripts:/ute/scripts
     networks:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 1
       placement:
         constraints:
           - node.labels.name == esx
-      resources:
-        limits:
-          cpus: '10'
-          memory: 3700M
+#      resources:
+#        limits:
+#          cpus: '10'
 
 
   ## worker service with resource values for a different system. service name
@@ -278,7 +279,7 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 2
+      replicas: 0
       placement:
         constraints:
           - node.labels.name == motoko
@@ -351,25 +352,25 @@ volumes:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=10.41.0.109,rw,cto,sync,nolock,noresvport
-#      o: addr=10.168.1.111,rw,cto,nolock,noresvport
-      device: ":/volume1/ute/inbox"
-#      device: ":/mnt/user/work/ute/inbox"
+#      o: addr=10.41.0.109,rw,cto,sync,nolock,noresvport
+      o: addr=10.168.1.111,rw,cto,nolock,noresvport
+#      device: ":/volume1/ute/inbox"
+      device: ":/mnt/user/work/ute/inbox"
  
   nfs-out:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=10.41.0.109,rw,cto,sync,nolock,noresvport
-#      o: addr=10.168.1.111,rw,cto,nolock,noresvport
-      device: ":/volume1/ute/outbox"
-#      device: ":/mnt/user/work/ute/outbox"
+#      o: addr=10.41.0.109,rw,cto,sync,nolock,noresvport
+      o: addr=10.168.1.111,rw,cto,nolock,noresvport
+#      device: ":/volume1/ute/outbox"
+      device: ":/mnt/user/work/ute/outbox"
 
   nfs-scripts:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=10.41.0.109,rw,cto,sync,nolock,noresvport
-#      o: addr=10.168.1.111,rw,cto,nolock,noresvport
-      device: ":/volume1/ute/scripts"
-#      device: ":/mnt/user/work/ute/scripts"
+#      o: addr=10.41.0.109,rw,cto,sync,nolock,noresvport
+      o: addr=10.168.1.111,rw,cto,nolock,noresvport
+#      device: ":/volume1/ute/scripts"
+      device: ":/mnt/user/work/ute/scripts"
