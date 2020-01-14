@@ -300,7 +300,7 @@ class Task:
                         --colorprim bt709 \
                         --transfer bt709 \
                         --colormatrix bt709 \
-                        --crf=18 \
+                        --crf=22 \
                         --fps {frt} \
                         --min-keyint 24 \
                         --keyint 240 \
@@ -406,14 +406,13 @@ class Task:
             since we've found existing progress, we're not sure which was the last fully
             completed chunk. So we're going to assume that if there are 'n' number of 
             workers available, they're probably the same number of workers from last 
-            time. Tasks done minus 'n'. But, just in case one worker is slower than the 
-            others, or we have a very small number or workers, lets just multiply them 
-            by three, and repeat that work.
+            time. Tasks done minus 'n'. If we miss a half-done job, it ought to be
+            caught by CheckWork()
 
             If very little work was done, then forget it and just restart at 0.
             '''
-            if startIndex > numOfWorkers * 3:
-                startIndex -= numOfWorkers * 3
+            if startIndex > numOfWorkers:
+                startIndex -= numOfWorkers
             else:
                 startIndex = 0
 
