@@ -2,34 +2,40 @@
 ##
 ## General Settings
 general_config:
-  inbox_path: "/ute/inbox"
-  outbox_path: "/ute/outbox"
+  inbox_path: /ute/inbox
+  high_priority_folder_name: ute_high
   keep_source_file: True
-    completed_folder_name: "done"
+  completed_folder_name: ute_done
+  outbox_path: /ute/outbox
+  vs_scripts_path: /ute/scripts/vs
+  file_poll_interval: 20
+  client_poll_interval: 30
 
-  file_poll_interval: 60
-  client_poll_interval: 60
 
-
+## there should not be any reason to change these settings
 database_config:
   results_poll_interval: 0.2
   client_tcp_keepalive: 600
-  log_level: "verbose"
+  log_level: verbose
   db_save: False
   active_rehashing: False
 
 
+## a 'task' represents all the information and state regarding the processing
+## of a file in UTE. these settings affect aspects of a task's encoding, 
+## muxing, subtitles, etc
 task_config:
-  log_level: "info"
-  task_size: 300
-  buffer_size: 100
+  log_level: info
+  job_size: 125
+  frame_buffer_size: 100
   job_timeout: 600
-  crop_sample_count: 31
+  crop_sample_count: 17
   timeOffsetPercent: 0.15
-
-
-crop_config:
-  cropdetect: "24:16:0"
+  check_work_thread_count: 4
+  find_work_thread_count_max: 16
+  vapoursynth_enabled: True
+  vs_script_name: denoise_best.py
+  crop_detect: "24:16:0"
 
 
 ## NFS Share Settings
@@ -37,7 +43,6 @@ nfs_config:
   server address: 10.168.1.111
   inbox path: /mnt/user/work/ute/inbox
   outbox path: /mnt/user/work/ute/outbox
-
 
 
 ## FFmpeg settings
@@ -53,4 +58,4 @@ ffmpeg_config:
 
 ## mkvmerge Settings
   generate-chapters:
-    interval: "300s"
+    interval: 300s
