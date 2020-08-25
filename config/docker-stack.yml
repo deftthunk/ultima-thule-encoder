@@ -43,21 +43,21 @@ services:
 
 
   ## RQ Dashboard w/ RQ 1.0 support
-  dashboard:
-    depends_on:
-      - redis
-    image: ute:rq-dashboard
-    ports:
-      - target: 9181
-        published: 9181
-        protocol: tcp
-        mode: ingress
-    deploy:
-      replicas: 0
-      placement:
-        constraints: [node.role == manager]
-    networks:
-      ute_net:
+  #dashboard:
+  #  depends_on:
+  #    - redis
+  #  image: ute:rq-dashboard
+  #  ports:
+  #    - target: 9181
+  #      published: 9181
+  #      protocol: tcp
+  #      mode: ingress
+  #  deploy:
+  #    replicas: 0
+  #    placement:
+  #      constraints: [node.role == manager]
+  #  networks:
+  #    ute_net:
 
 
   ## docker stats web UI
@@ -111,6 +111,10 @@ services:
       - nfs-out:/ute/outbox
     networks:
       ute_net:
+    configs:
+      - source: ute_config
+        target: /ute.yaml
+        mode: 0444
     deploy:
       replicas: 1
       placement:
@@ -279,21 +283,21 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 2
+      replicas: 3
       placement:
         constraints:
           - node.labels.name == motoko
-#      resources:
-#        limits:
-#          cpus: '10'
+      resources:
+        limits:
+          cpus: '6'
 #          memory: 6000M
 
 
   ## worker service with resource values for a different system. service name
   ## must be different from other worker service.
-  worker-t410:
+  worker-rpi4:
     environment:
-      UTE_HOSTNAME: t410
+      UTE_HOSTNAME: rpi4
     depends_on:
       - redis
     image: ute:worker
@@ -306,10 +310,10 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 1
+      replicas: 0
       placement:
         constraints:
-          - node.labels.name == t410
+          - node.labels.name == rpi4
 
 
   ## global service (one service instance per swarm host) to build x265 in a
@@ -371,3 +375,12 @@ volumes:
 #      o: addr=10.168.1.111,rw,cto,nolock,noresvport
       device: ":/volume1/ute/scripts"
 #      device: ":/mnt/user/work/ute/scripts"
+
+
+
+## UTE Global Configuration File ('ute.yaml')
+# Makes the config file accessible to the swarm services on boot
+# This ought to never need modification.
+configs:
+  ute_config:
+    file: config/ute.yaml
