@@ -1,0 +1,53 @@
+## Task Settings
+##
+## a 'task' represents all the information and state regarding the processing of a file 
+## in UTE. these settings affect aspects of a task's encoding, muxing, subtitles, etc
+TASK:
+  config_file_persist: False
+  log_level: info
+  job_size: 125
+  frame_buffer_size: 100
+  job_timeout: 600
+  crop_sample_count: 17
+  timeOffsetPercent: 0.15
+  check_work_thread_count: 4
+  find_work_thread_count_max: 16
+  crop_detect: "24:16:0"
+
+
+  # The arguments '-ss', '-hide_banner', and '-i', are reserved by 
+  # UTE, and will be overwritten if present
+  # 
+  # UTE also adds '-filter:v "crop=<calulated value>"', as is calculated by the 
+  # 'crop_config' section above. It can be overridden (along with all task settings) via
+  # ".utconf.yml" config files co-located with the target video file
+  #
+  # Multiple lines are OK, but following lines must be indented past the 'ffmpeg' marker
+  ffmpeg: ffmpeg -f yuv4mpegpipe -1 -loglevel fatal
+
+
+  # UTE reserves the following arguments for use, and will overwrite these options if 
+  # found:
+  # '--frames', '--chunk-start', '--chunk-end', '--fps', and '-o'
+  #
+  # It is suggested to not use settings affecting how the encoder utilizes hardware 
+  # resources, such as the '--pools' option in x265. If you want to affect how CPU 
+  # resources are used, this is best done through granular settings in "docker-stack.yml".
+  #
+  # The resuling encoding string will be connected to FFMPEG via a pipe ('|') and work on
+  # the data in a stream context
+  #
+  # Future releases may provide support for other encoders such as AV1
+  #
+  # Multiple lines are OK, but following lines must be indented past the 'encoder' marker
+  encoder: x265 --log-level info --no-open-gop --colorprim bt709 --transfer bt709 
+    --colormatrix bt709 --crf=26 --min-keyint 24 --keyint 240 --sar 1:1 --preset slow 
+    --ctu 64 --y4m 
+
+
+  preprocess:
+    vapoursynth_enabled: False
+    vs_script_name: denoise_best.py
+
+
+

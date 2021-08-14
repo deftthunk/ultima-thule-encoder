@@ -164,9 +164,9 @@ services:
 
   ## worker service with resource values for a different system. service name
   ## must be different from other worker service.
-  worker-nuc:
+  worker-t410:
     environment:
-      UTE_HOSTNAME: nuc
+      UTE_HOSTNAME: t410
     depends_on:
       - redis
     image: ute:worker
@@ -178,47 +178,21 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 1
       placement:
         constraints:
-          - node.labels.name == nuc
-      resources:
-        limits:
-          cpus: '4'
-          memory: 4000M
-
-
-  ## worker service with resource values for a different system. service name
-  ## must be different from other worker service.
-  worker-esx:
-    environment:
-      UTE_HOSTNAME: esx
-    depends_on:
-      - redis
-    image: ute:worker
-    volumes:
-      - nfs-in:/ute/inbox
-      - nfs-out:/ute/outbox
-      - x265-vol:/ute/x265
-      - nfs-scripts:/ute/scripts
-    networks:
-      ute_net:
-    deploy:
-      mode: replicated
-      replicas: 0
-      placement:
-        constraints:
-          - node.labels.name == esx
+          - node.labels.name == t410
 #      resources:
 #        limits:
-#          cpus: '10'
+#          cpus: '4.0'
+#          memory: 4000M
 
 
   ## worker service with resource values for a different system. service name
   ## must be different from other worker service.
-  worker-kvm:
+  worker-trainer:
     environment:
-      UTE_HOSTNAME: kvm
+      UTE_HOSTNAME: trainer
     depends_on:
       - redis
     image: ute:worker
@@ -230,40 +204,14 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 1
       placement:
         constraints:
-          - node.labels.name == kvm
-      resources:
-        limits:
-          cpus: '6'
-          memory: 4000M
-
-
-  ## worker service with resource values for a different system. service name
-  ## must be different from other worker service.
-  worker-minion:
-    environment:
-      UTE_HOSTNAME: minion
-    depends_on:
-      - redis
-    image: ute:worker
-    volumes:
-      - nfs-in:/ute/inbox
-      - nfs-out:/ute/outbox
-      - x265-vol:/ute/x265
-    networks:
-      ute_net:
-    deploy:
-      mode: replicated
-      replicas: 0
-      placement:
-        constraints:
-          - node.labels.name == minion
-      resources:
-        limits:
-          cpus: '4'
-          memory: 3000M
+          - node.labels.name == trainer
+#      resources:
+#        limits:
+#          cpus: '4.0'
+#          memory: 3000M
 
 
   ## worker service with resource values for a different system. service name
@@ -289,15 +237,15 @@ services:
           - node.labels.name == motoko
       resources:
         limits:
-          cpus: '6'
+          cpus: '6.0'
 #          memory: 6000M
 
 
   ## worker service with resource values for a different system. service name
   ## must be different from other worker service.
-  worker-rpi4:
+  worker-debian:
     environment:
-      UTE_HOSTNAME: rpi4
+      UTE_HOSTNAME: debian
     depends_on:
       - redis
     image: ute:worker
@@ -310,10 +258,10 @@ services:
       ute_net:
     deploy:
       mode: replicated
-      replicas: 0
+      replicas: 1
       placement:
         constraints:
-          - node.labels.name == rpi4
+          - node.labels.name == debian
 
 
   ## global service (one service instance per swarm host) to build x265 in a
@@ -383,4 +331,4 @@ volumes:
 # This ought to never need modification.
 configs:
   ute_config:
-    file: config/ute.yaml
+    file: global.uteconf.yaml
