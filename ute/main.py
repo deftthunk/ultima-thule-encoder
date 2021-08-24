@@ -50,7 +50,7 @@ def getConfiguration():
     return config.load("/ute.yaml")
 
 
-def get_client_count(redis_link: Redis, worker_list: List[Worker], logger: Logger) -> List[Worker]:
+def getClientCount(redis_link: Redis, worker_list: List[Worker], logger: Logger) -> List[Worker]:
     workers = Worker.all(connection=redis_link)
     logger.debug("Found " + str(len(workers)) + " workers")
 
@@ -92,11 +92,11 @@ def main() -> None:
     thread_id, high_threads, low_threads = 0, 0, 0
 
     ## check for available workers
-    worker_list = get_client_count(redis_link, [], logger)
+    worker_list = getClientCount(redis_link, [], logger)
     worker_count = len(worker_list)
     if worker_count == 0:
         logger.debug("No workers, sleeping")
-        while len(get_client_count(redis_link, worker_list, logger)) == 0:
+        while len(getClientCount(redis_link, worker_list, logger)) == 0:
             sleep(20)
 
     while len(worker_list) > 0:
@@ -169,7 +169,7 @@ def main() -> None:
                 thread_id = 1
 
             tm = TaskManager(target_queue, redis_link, task_item, worker_count, thread_id, redis_queues['dummy'])
-            thread = threading.Thread(target = tm.Start())
+            thread = threading.Thread(target = tm.start())
 
             logger.debug("Starting thread")
             thread.start()

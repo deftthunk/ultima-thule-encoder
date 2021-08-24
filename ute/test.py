@@ -1,14 +1,14 @@
-import files
-import logging
-import config
+from logging import getLogger
 from collections import deque
+from ute.config import load
+from ute.files import findWork
 
 threadKeeper = {}
 internal = {'low':deque(), 'high':deque(), 'preprocess':deque()}
-logger = logging.getLogger('test')
-conf = config.load("global.uteconf.yaml")
+logger = getLogger('test')
+conf = load("global.uteconf.yaml")
 
  
-ret = files.FindWork(internal, threadKeeper, logger, conf)
+ret = findWork(internal, threadKeeper, logger, conf)
 for f in ret:
     print(f.video_file_path)

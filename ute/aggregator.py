@@ -1,18 +1,18 @@
-import pickle
-import logging
-import logging.handlers
-import socketserver
 import struct
+from pickle import loads
+from logging import basicConfig, makeLogRecord, getLogger
+from logging.handlers import DEFAULT_TCP_LOGGING_PORT
+from socketserver import ThreadingTCPServer, StreamRequestHandler
 
 
-class LogRecordStreamHandler(socketserver.StreamRequestHandler):
+class LogRecordStreamHandler(StreamRequestHandler):
     """Handler for a streaming logging request.
 
     This basically logs the record using whatever logging policy is
     configured locally.
     """
 
-    def handle(self):
+    def handle(self) -> None:
         """
         Handle multiple requests - each expected to be a 4-byte length,
         followed by the LogRecord in pickle format. Logs the record
@@ -27,37 +27,38 @@ class LogRecordStreamHandler(socketserver.StreamRequestHandler):
             while len(chunk) < slen:
                 chunk = chunk + self.connection.recv(slen - len(chunk))
             obj = self.unPickle(chunk)
-            record = logging.makeLogRecord(obj)
+            record = makeLogRecord(obj)
             self.handleLogRecord(record)
 
-    def unPickle(self, data):
-        return pickle.loads(data)
+    def unPickle(self, data: bytes):
+        return loads(data)
 
-    def handleLogRecord(self, record):
+    def handleLogRecord(self, record) -> None:
         # if a name is specified, we use the named logger rather than the one
         # implied by the record.
         if self.server.logname is not None:
             name = self.server.logname
         else:
             name = record.name
-        logger = logging.getLogger(name)
+        logger = getLogger(name)
         # N.B. EVERY record gets logged. This is because Logger.handle
         # is normally called AFTER logger-level filtering. If you want
         # to do filtering, do it at the client end to save wasting
         # cycles and network bandwidth!
         logger.handle(record)
 
-class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
+
+class LogRecordSocketReceiver(ThreadingTCPServer):
     """
     Simple TCP socket-based logging receiver suitable for testing.
     """
 
     allow_reuse_address = True
 
-    def __init__(self, host='0.0.0.0',
-                 port = logging.handlers.DEFAULT_TCP_LOGGING_PORT,
-                 handler = LogRecordStreamHandler):
-        socketserver.ThreadingTCPServer.__init__(self, (host, port), handler)
+    def __init__(self, host: str = '0.0.0.0',
+                 port: int = DEFAULT_TCP_LOGGING_PORT,
+                 handler = LogRecordStreamHandler) -> None:
+        ThreadingTCPServer.__init__(self, (host, port), handler)
         self.abort = 0
         self.timeout = 1
         self.logname = 'ute'
@@ -73,9 +74,8 @@ class LogRecordSocketReceiver(socketserver.ThreadingTCPServer):
                 self.handle_request()
             abort = self.abort
 
-def main():
-    logging.basicConfig(
-        format = '%(name)-12s %(levelname)-7s %(message)s')
+def main() -> None:
+    basicConfig(format = '%(name)-12s %(levelname)-7s %(message)s')
     tcpserver = LogRecordSocketReceiver()
     print('Starting TCP server...')
     tcpserver.serve_until_stopped()

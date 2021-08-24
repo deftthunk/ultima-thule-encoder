@@ -1,8 +1,8 @@
 import re, os, math, sys
 import shutil
 import subprocess
-import logging
-from typing import List, Dict, Tuple
+from logging import getLogger, DEBUG
+from typing import List, Dict, Tuple, Any
 from statistics import mode, StatisticsError
 from pathlib import Path
 from time import sleep
@@ -13,7 +13,7 @@ import ute.files
 
 
 class Task:
-    def __init__(self, configDict):
+    def __init__(self, configDict: Dict[str, Any]):
         self.thread_id = configDict['threadId']
         self.inbox = configDict['inbox']
         self.outbox = configDict['outbox']
@@ -32,11 +32,11 @@ class Task:
 
         self.average_fps = {}
         self.outbound_folder_path = self.MakeOutboundFolderPath()
-        self.logger = logging.getLogger("ute.task-" + str(self.thread_id))
+        self.logger = getLogger("ute.task-" + str(self.thread_id))
 
 
 
-    def build_cmd_string(self, 
+    def buildCommandString(self, 
                         frame_count_total: int, 
                         frame_rate: float, 
                         duration: int) -> Tuple[List[str], str, List[Tuple[str, str]]]:
@@ -249,7 +249,7 @@ class Task:
 
 
 
-    def check_for_prior_work(self, chunk_paths: List[str], number_of_workers: int) -> int:
+    def checkForPriorWork(self, chunk_paths: List[str], number_of_workers: int) -> int:
         '''
         look for existing files in the target's outbound folder. if present, count the number
         of jobs done, then attempt to estimate where to pick up by finding the number of 
@@ -282,7 +282,7 @@ class Task:
         return start_index
 
 
-    def populate_queue(self, queue: Queue, encode_tasks: List[str]) -> List[Tuple[str, Job]]:
+    def populateQueue(self, queue: Queue, encode_tasks: List[str]) -> List[Tuple[str, Job]]:
         '''
         Queue up all tasks by calling 'encode.delay()', which is a Celery method for 
         asynchronously queuing tasks in our message broker (RabbitMQ). 'encode' is 
@@ -307,7 +307,7 @@ class Task:
 
 
 
-    def wait_for_task_completion(self, queue: Queue, job_list: List[Tuple[str, Job]]) -> None:
+    def waitForTaskCompletion(self, queue: Queue, job_list: List[Tuple[str, Job]]) -> None:
         '''
         poll tasks for their status, and requeue them if there's a failure
         '''
@@ -338,7 +338,7 @@ class Task:
                     (fps, hostname, nodename) = job.result
 
                     ## get FPS average data
-                    ret = self.calculate_average_fps(fps, nodename)
+                    ret = self.calculateAverageFps(fps, nodename)
                     if ret > 0:
                         fpsAverage = ret
 
@@ -373,7 +373,7 @@ class Task:
                     job.delete()
 
                     ## build and requeue a new instance of that job
-                    new_job = self.requeue_job(argsParam, q, jobId)
+                    new_job = self.requeueJob(argsParam, q, jobId)
                     delete_index = i
                     break
                 elif job.get_status() != "queued" and job.get_status() != "started":
@@ -416,7 +416,7 @@ class Task:
             sleep(1)
 
 
-    def calculate_average_fps(self, fps, nodename):
+    def calculateAverageFps(self, fps: float, nodename: str) -> float:
         '''
         Make an attempt to determine how many frames per second are being computed on the 
         stack. We don't have instantaneous insight into every node's x265 encoder output, 
@@ -426,7 +426,7 @@ class Task:
         the cluster, and starts a rolling average with each new figure.
         '''
         self.average_fps[nodename] = fps
-        avg = 0
+        avg = 0.0
 
         ## wait for all workers to report before rolling calculations
         if len(self.average_fps) >= self.task_workers:
@@ -436,7 +436,7 @@ class Task:
         return avg
 
 
-    def requeue_job(self, argsParam, queue: Queue, job_id: str) -> Job:
+    def requeueJob(self, argsParam, queue: Queue, job_id: str) -> Job:
         '''
         Requeue a job on Redis/RQ, and ensure it is positioned for immediate processing
 
@@ -458,7 +458,7 @@ class Task:
 
 
 
-    def check_work(self, 
+    def checkWork(self, 
                 chunk_paths: List[Tuple[str, str]], 
                 job_handles: List[Tuple[str, Job]], 
                 return_array: List[list], 
@@ -577,7 +577,7 @@ class Task:
 
 
 
-    def rebuild_video(self, full_outbound_path: str) -> str:
+    def rebuildVideo(self, full_outbound_path: str) -> str:
         '''
         use mkvmerge tool to piece together the completed video from chunk files.
         function builds the command string, which ends up in the format:
@@ -592,7 +592,7 @@ class Task:
         dirFiles.sort()
         tempFileName = '_'.join(['noaudio', self._getFileName(self.target)])
         no_audio_file_path = '/'.join([full_outbound_path, tempFileName])
-        if self.log_level == logging.DEBUG:
+        if self.log_level == DEBUG:
             quiet = ''
         else:
             quiet = '--quiet'
@@ -615,7 +615,7 @@ class Task:
         return no_audio_file_path
 
 
-    def merge_audio(self, no_audio_file_path: str, full_outbound_path: str) -> str:
+    def mergeAudio(self, no_audio_file_path: str, full_outbound_path: str) -> str:
         '''
         use mkvmerge to recombine the newly merged video track with the original audio track
         from the source.
@@ -625,7 +625,7 @@ class Task:
         final_file_name = '/'.join([full_outbound_path, self._getFileName(self.target)])
         ## append a status indicator so users know the file is still being built
         tempFileName = final_file_name + '.processing'
-        if self.log_level == logging.DEBUG:
+        if self.log_level == DEBUG:
             quiet = ''
         else:
             quiet = '--quiet'
@@ -646,7 +646,7 @@ class Task:
         return final_file_name
 
 
-    def clean_out_folder(self, full_outbound_path: str, final_file_name: str) -> None:
+    def cleanOutFolder(self, full_outbound_path: str, final_file_name: str) -> None:
         '''
         Verify that a new video file is in the destination folder, and if so
         delete all video chunks and surplus data

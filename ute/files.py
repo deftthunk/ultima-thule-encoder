@@ -26,14 +26,14 @@ class TaskItem:
         self.lsmash_path = lsmash_path
 
 
-    def get_file_name(self, path=None):
+    def getFileName(self, path: str=None):
         if path == None:
             return os.path.basename(self.video_file_path)
         else:
             return os.path.basename(path)
 
 
-    def push_to_queue(self, queue):
+    def pushToQueue(self, queue):
         '''
         Add new item to a queue
         '''
@@ -41,7 +41,7 @@ class TaskItem:
         return len(queue)
 
 
-    def get_frame_count(self, method='default'):
+    def getFrameCount(self, method='default'):
         '''
         Find the number of frames in the video. this can be error prone, so multiple
         methods are attempted
@@ -102,7 +102,7 @@ class TaskItem:
 
 
 
-    def detect_cropping(self, duration):
+    def detectCropping(self, duration):
         '''
         Use ffmpeg to detect video cropping in target sample function attempts to do a 
         sampling across the file by avoiding the beginning and end (intro/credits) and 
@@ -158,7 +158,7 @@ class TaskItem:
                 return ''
 
 
-    def get_position(self, pos, fps):                                                           
+    def getPosition(self, pos, fps):                                                           
         '''                                                                                      
         Calculate the position in the video (timewise) based on the frame we're                  
         looking for and how many frames per second it runs at                                    
@@ -167,7 +167,7 @@ class TaskItem:
         return newPos
 
 
-    def get_outbound_folder_path(self):
+    def getOutboundFolderPath(self):
         '''
         Return the name of this file's outbox folder, and make it if it doesn't
         yet exist in outbox
@@ -208,7 +208,7 @@ class TaskItem:
         shutil.move(completedFolder, moveTargetOutboxPath)
 
 
-#    def IndicateCompleted(self, completedFolder):
+#    def indicateCompleted(self, completedFolder):
 
 
 
@@ -221,7 +221,7 @@ class TaskItem:
 
 
 
-def _check_file_transfer_progress(files, logger):
+def _checkFileTransferProgress(files, logger):
     '''
     Detect when a file is still in the process of being copied into the inbox.
     if so, ignore the file and we'll evaluate it again on the next pass.
@@ -278,11 +278,11 @@ def _check_file_transfer_progress(files, logger):
     return finalList
 
 
-def detect_file_type(file_path):
+#def detect_file_type(file_path):
 
 
 
-def _get_new_files(work_queues, threadKeeper, logger, config):
+def _getNewFiles(work_queues, threadKeeper, logger, config):
     '''
     GetNewFiles() looks for work in NFS inbox file share. it detects folders by looking at the
     length of the filepath. if the filepath is longer, it's a folder. if the folder
@@ -357,14 +357,15 @@ def _get_new_files(work_queues, threadKeeper, logger, config):
                 log_str = "File path is outside UTE's inbox management area: " + str(odd_path)
                 logger.warning(str(log_str))
 
-
+'''
     config_paths = {}
     for priority, array in new_lists.items():
         file_type = detectFileType(f)
         if file_type == 
+'''
 
 
-def return_new_files(new_lists, work_queues, activeFiles)
+def returnNewFiles(new_lists, work_queues, activeFiles)
     '''
     check for new files by finding the difference between the work queue 
     and the list of files we just made.
@@ -416,9 +417,9 @@ the relevant task items.
 '''
 
 
-def find_work(work_queues: Dict, thread_keeper: Dict, logger: Logger, config) -> List[TaskItem]:
+def findWork(work_queues: Dict, thread_keeper: Dict, logger: Logger, config) -> List[TaskItem]:
     task_items = []
-    new_low_files, new_high_files = _get_new_files(
+    new_low_files, new_high_files = _getNewFiles(
             work_queues, thread_keeper, logger, config
         )
 

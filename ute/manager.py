@@ -5,12 +5,19 @@ from time import sleep
 from redis import Redis
 from rq import Queue, Job
 
-import ute.files
 import ute.config
 from ute.task import Task
 from ute.files import TaskItem
 
 class TaskManager:
+    '''
+    Oversee the lifecycle of a task from creation to termination. This includes:
+    - preprocessing
+    - config reading
+    - communicating thread state and progress
+    - post processing
+    - plugin loading
+    '''
     def __init__(self, 
                 target_queue: Queue, 
                 redis_link: Redis, 
@@ -29,7 +36,7 @@ class TaskManager:
 
 
 
-    #def Start(self):
+    #def start(self):
     #    if self.task_item.
 
 
@@ -56,8 +63,8 @@ class TaskManager:
             # 'jobSize' : config_jobSize,
                 'worker_count' : self.worker_count })
 
-        frame_count_total, frame_rate, duration = ute.files.get_frame_count()
-        encodeTasksReference, outboundFile, chunk_paths = task.build_cmd_string(
+        frame_count_total, frame_rate, duration = self.task_item.getFrameCount()
+        encodeTasksReference, outboundFile, chunk_paths = task.buildCommandString(
                 frame_count_total, frame_rate, duration)
         ## determine full path of folder for video chunks and create folder if not present
         full_outbound_path = ute.files.get_outbound_folder_path()
@@ -68,11 +75,11 @@ class TaskManager:
         if there's existing work already, CheckForPriorWork() will shorten the 
         'encodeTasks' list for PopulateQueue()
         '''
-        encoding_start_index = task.check_for_prior_work(chunk_paths, self.worker_count)
+        encoding_start_index = task.checkForPriorWork(chunk_paths, self.worker_count)
         encodeTasksActual = encodeTasksReference[encoding_start_index:]
 
         #q, jobHandles = task.populate_queue(self.target_queue, encodeTasksActual)
-        jobHandles = task.populate_queue(self.target_queue, encodeTasksActual)
+        jobHandles = task.populateQueue(self.target_queue, encodeTasksActual)
 
         '''
         if the task queues are different lengths, it means we are executing on
@@ -85,7 +92,7 @@ class TaskManager:
         if len(encodeTasksReference) != len(encodeTasksActual):
             #rq_dummy, jobHandlesReference = task.populate_queue(rq_dummy, encodeTasksReference)
             #rq_dummy.empty()
-            job_handles_reference = task.populate_queue(self.dummy_queue, encodeTasksReference)
+            job_handles_reference = task.populateQueue(self.dummy_queue, encodeTasksReference)
             self.dummy_queue.empty()
 
         else:
@@ -101,7 +108,7 @@ class TaskManager:
 
         while True:
             self.logger.info("TID:{} Waiting on jobs".format(str(self.thread_id)))
-            task.wait_for_task_completion(self.target_queue, jobHandles.copy())
+            task.waitForTaskCompletion(self.target_queue, jobHandles.copy())
 
             self.logger.info("TID:{} Checking work for errors".format(str(self.thread_id)))
             threadArray = []
@@ -135,7 +142,7 @@ class TaskManager:
                 chunks requiring requeing, and the index in which to place their array of failed chunks
                 '''
                 thread = threading.Thread(
-                    target = task.check_work,
+                    target = task.checkWork,
                         args = (chunk_paths[start:end], job_handles_reference, job_handles_temp, t)
                 )
 
@@ -171,7 +178,7 @@ class TaskManager:
             if len(jobHandles) > 0:
                 chunk_paths = []
                 for jobId, job in jobHandles:
-                    task.requeue_job(job.args, self.target_queue, jobId)
+                    task.requeueJob(job.args, self.target_queue, jobId)
                     jobPath = re.search(r' -o .*?(/.*\.265)', str(job.args))
                     subPath = jobPath.group(1).split(outbox)[-1][1:]
                     chunk_paths.append((outbox, subPath))
@@ -221,15 +228,15 @@ class TaskManager:
 
         ## wrap things up. merge chunks, merge audio, handle source file, etc
         self.logger.info("TID:{} Building new Matroska file".format(str(self.thread_id)))
-        no_audio_file_path = task.rebuild_video(full_outbound_path)
+        no_audio_file_path = task.rebuildVideo(full_outbound_path)
 
         self.logger.info("TID:{} Merging audio tracks into new MKV file".format(str(self.thread_id)))
-        self.task_item.finalFileName = task.merge_audio(no_audio_file_path, full_outbound_path)
+        self.task_item.finalFileName = task.mergeAudio(no_audio_file_path, full_outbound_path)
 
         if retainChunks == False:
             sleep(1)
             self.logger.info("TID:{} Clearing out '.265' chunk files".format(str(self.thread_id)))
-            task.clean_out_folder(self.task_item.fullOutboundPath, self.task_item.finalFileName)
+            task.cleanOutFolder(self.task_item.fullOutboundPath, self.task_item.finalFileName)
         else:
             self.logger.info("TID:{} Retaining '.265' chunk files".format(str(self.thread_id)))
 
