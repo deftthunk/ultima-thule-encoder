@@ -9,7 +9,7 @@ from time import sleep
 from redis import Redis
 from rq import Queue, Worker, Job
 
-import ute.files
+import ute.items
 
 
 class Task:
@@ -312,7 +312,7 @@ class Task:
         poll tasks for their status, and requeue them if there's a failure
         '''
 
-        fail_registry = q.failed_job_registry
+        fail_registry = queue.failed_job_registry
         delete_index = None
         poll_size = self.task_workers * 2 + 1
         jobNum = len(job_list)
@@ -367,13 +367,13 @@ class Task:
                     ## get job info before we delete it
                     argsParam = job.args
                     fail_registry.remove(job)
-                    q.remove(job)
+                    queue.remove(job)
 
                     ## cancels the job and deletes job hash from Redis
                     job.delete()
 
                     ## build and requeue a new instance of that job
-                    new_job = self.requeueJob(argsParam, q, jobId)
+                    new_job = self.requeueJob(argsParam, queue, jobId)
                     delete_index = i
                     break
                 elif job.get_status() != "queued" and job.get_status() != "started":

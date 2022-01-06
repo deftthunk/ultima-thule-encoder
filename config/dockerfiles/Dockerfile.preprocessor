@@ -116,7 +116,7 @@ ENV PATH="$PATH:/ute/x265:/home/utbot/.local/bin:/usr/local/sbin:/usr/local/bin"
 ## set celery execution path
 COPY ./resources/preprocessor/run.sh /home/utbot/run.sh
 COPY ./resources/preprocessor/run_root.sh /run_root.sh
-COPY ./src /home/utbot/utecode/
+COPY ./ute /home/utbot/utecode/
 #ENV PATH="/home/utbot/.local/bin:${PATH}"
 #ENV PATH="/ute/x265:${PATH}"
 

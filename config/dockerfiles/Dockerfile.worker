@@ -34,7 +34,7 @@ RUN pip3 install rq --user
 ## set celery execution path
 COPY ./resources/worker/run.sh /home/utbot/run.sh
 COPY ./resources/worker/run_root.sh /run_root.sh
-COPY ./src /home/utbot/utecode/
+COPY ./ute /home/utbot/utecode/
 ENV PATH="/home/utbot/.local/bin:${PATH}"
 ENV PATH="/ute/x265:${PATH}"
 

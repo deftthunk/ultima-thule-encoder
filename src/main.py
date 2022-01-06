@@ -12,8 +12,8 @@ from time import sleep
 from redis import Redis
 from rq import Queue, Worker
 
-import ute.config
-from ute.files import find_work
+from ute.config import load
+from ute.items import find_work
 from ute.manager import TaskManager
 from ute.task import Task
 
@@ -47,7 +47,7 @@ def purgeActive(q, logger: Logger) -> None:
 
 def getConfiguration():
     ## retrieve UTE global config settings
-    return config.load("/ute.yaml")
+    return load("/ute.yaml")
 
 
 def getClientCount(redis_link: Redis, worker_list: List[Worker], logger: Logger) -> List[Worker]:

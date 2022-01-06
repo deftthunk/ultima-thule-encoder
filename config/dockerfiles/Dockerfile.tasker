@@ -7,10 +7,10 @@ RUN apt-get update && \
                 python3-setuptools \
                 python3-wheel \
                 python3-dev \
-		mediainfo \
+                mediainfo \
                 mkvtoolnix \
                 locales-all \
-		ffmpeg && \
+                ffmpeg && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/* && \
   useradd -ms /bin/bash utbot && \
@@ -26,7 +26,7 @@ WORKDIR /home/utbot
 RUN pip3 install redis --user
 RUN pip3 install rq --user
 
-COPY ./src /home/utbot/utecode/
+COPY ./ute /home/utbot/utecode/
 ENV PATH="/home/utbot/.local/bin:${PATH}"
 
 COPY ./resources/tasker/run.sh /home/utbot/run.sh

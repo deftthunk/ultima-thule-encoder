@@ -365,7 +365,7 @@ def _getNewFiles(work_queues, threadKeeper, logger, config):
 '''
 
 
-def returnNewFiles(new_lists, work_queues, activeFiles)
+def returnNewFiles(new_lists, work_queues, activeFiles):
     '''
     check for new files by finding the difference between the work queue 
     and the list of files we just made.
@@ -459,7 +459,7 @@ def findWork(work_queues: Dict, thread_keeper: Dict, logger: Logger, config) -> 
 
 if __name__ == "__main__":
     import logging
-    import ute.config
+    from . import config
     from collections import deque
 
     threadKeeper = {}

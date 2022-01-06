@@ -8,7 +8,7 @@ RUN apt-get update && \
   rm -rf /var/lib/apt/lists/* && \
   useradd -ms /bin/bash utbot
 
-COPY ./src /home/utbot/utecode/
+COPY ./ute /home/utbot/utecode/
 RUN chown -R utbot:utbot /home/utbot
 USER utbot
 WORKDIR /home/utbot

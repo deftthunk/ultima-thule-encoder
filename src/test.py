@@ -1,7 +1,7 @@
 from logging import getLogger
 from collections import deque
 from ute.config import load
-from ute.files import findWork
+from ute.items import findWork
 
 threadKeeper = {}
 internal = {'low':deque(), 'high':deque(), 'preprocess':deque()}
